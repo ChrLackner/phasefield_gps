@@ -1,0 +1,14 @@
+[build-system]
+requires = [ "setuptools>=60", "wheel", "setuptools-scm>=8.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "phasefield_gps"
+dynamic = ["version"]
+dependencies = ["ngsolve", "matplotlib"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools_scm]
+version_file = "src/phasefield_gps/_version.py"
