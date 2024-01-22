@@ -148,48 +148,50 @@ l : float
         fes_comp = h1
         if self.mass_conservation:
             fes_comp = h1*h1
-        fes_comps = fes_comp**(n_c-1)
+        if n_c > 2:
+            fes_comp = fes_comp**(n_c-1)
         fes_phase = h1**n_p
-        self.fes = fes_comps * fes_phase
-        w, etas = self.fes.TrialFunction()
-        dw, detas = self.fes.TestFunction()
+        self.fes = fes_comp * fes_phase
+        trial = self.fes.TrialFunction()
+        test = self.fes.TestFunction()
+        w, etas = trial[:-1], trial[-1]
+        dw, detas = test[:-1], test[-1]
         if self.mass_conservation:
-            c = [w[i][0] for i in range(n_c-1)]
-            w = [w[i][1] for i in range(n_c-1)]
-            dc = [dw[i][1] for i in range(n_c-1)]
-            dw = [dw[i][0] for i in range(n_c-1)]
+            c = [w[i*2+1] for i in range(n_c-1)]
+            w = [w[i*2] for i in range(n_c-1)]
+            dc = [dw[i*2+1] for i in range(n_c-1)]
+            dw = [dw[i*2] for i in range(n_c-1)]
 
         self.gf = ngs.GridFunction(self.fes)
-        self.gfw = self.gf.components[0]
-        self.gfetas = self.gf.components[1]
+        self.gfw = self.gf.components[:-1]
+        self.gfetas = self.gf.components[-1]
         if self.mass_conservation:
-            self.gfcs = [gf.components[1] for gf in self.gfw.components]
-            self.gfw = [gf.components[0] for gf in self.gfw.components]
+            self.gfcs = self.gfw[1]
+            self.gfw = self.gfw[0]
         self.gf_old = ngs.GridFunction(self.fes)
-        gfw_old = self.gf_old.components[0]
-        gfetas_old = self.gf_old.components[1]
+        gfw_old = self.gf_old.components[:-1]
+        gfetas_old = self.gf_old.components[-1]
         if self.mass_conservation:
-            gfcs_old = [gf.components[1] for gf in gfw_old.components]
-            gfw_old = [gf.components[0] for gf in gfw_old.components]
+            gfcs_old = gfw_old[1]
+            gfw_old = gfw_old[0]
 
         omega = self.get_energy(etas, w)
 
         self.a = ngs.BilinearForm(self.fes)
         self.a += 1/self.dt * (etas-gfetas_old) * detas * ngs.dx
         self.a += self.L * (omega * ngs.dx).Diff(etas, detas)
-        # for eta, eta_old, deta in zip(etas, gfetas_old, detas):
-        #     self.a += 1/self.dt * (eta - eta_old) * deta * ngs.dx
-        #     self.a += self.L * (omega * ngs.dx).Diff(eta, deta)
-
+        
         # TODO: Implement for multiple components
         list_etas = [etai for etai in etas]
         concentrations = self._get_concentrations(list_etas, w)
         if self.mass_conservation:
-            self.a += 1/self.dt * (c[0]-gfcs_old[0]) * dc[0] * ngs.dx
+            for ci, dci, gfci_old in zip(c, dc, [gfcs_old]):
+                self.a += 1/self.dt * (ci-gfci_old) * dci * ngs.dx
             Dchi = self.get_D_times_chi(etas, w)
             for wi, dci in zip(w, dc):
                 self.a += self.Vm * Dchi * ngs.InnerProduct(ngs.grad(wi),ngs.grad(dci)) * ngs.dx
-            self.a += (concentrations[self.components[0]] - c[0]) * dw * ngs.dx
+            for ci, dwi in zip(c, dw):
+                self.a += (concentrations[self.components[0]] - ci) * dwi * ngs.dx
         else:
             chi = self.get_chi(etas, w)
             Dchi = self.get_D_times_chi(etas, w)
@@ -224,7 +226,7 @@ Initial conditions for phase. For components, for each phase an initial conditio
             tmp = self.gfw.vec.CreateVector()
             tmp[:] = 0
             if self.mass_conservation:
-                tmp2 = self.gfcs[0].vec.CreateVector()
+                tmp2 = self.gfcs.vec.CreateVector()
                 tmp2[:] = 0
             hs = self.h(self.gfetas)
             # TODO: Implement for multiple components
@@ -237,11 +239,11 @@ Initial conditions for phase. For components, for each phase an initial conditio
                 self.gfw.Set(h * potentials[self.components[0]])
                 tmp += self.gfw.vec
                 if self.mass_conservation:
-                    self.gfcs[0].Set(h * concentrations[self.components[0]])
-                    tmp2 += self.gfcs[0].vec
+                    self.gfcs.Set(h * concentrations[self.components[0]])
+                    tmp2.data += self.gfcs.vec
             self.gfw.vec.data = tmp
             if self.mass_conservation:
-                self.gfcs[0].vec.data = tmp2
+                self.gfcs.vec.data = tmp2
 
     def do_timestep(self):
         if not hasattr(self, "a"):
