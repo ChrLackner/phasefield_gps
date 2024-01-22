@@ -16,7 +16,7 @@ class GrandPotentialSolver:
                  interface_width: float):
         """
 See https://link.aps.org/doi/10.1103/PhysRevE.98.023309 for details.
-        
+
 Parameters
 ----------
 mesh : ngs.Mesh
@@ -40,13 +40,14 @@ l : float
         self.phase_indices = { phase : i for i, phase in enumerate(self.phases) }
         self.component_indices = { component : i for i, component in enumerate(self.components) }
         self.dt = ngs.Parameter(0.01)
+        self._user_timestep = None
         self.order = 2
         self.mass_conservation = True
         self.gamma = ngs.Matrix(len(self.phase_indices), len(self.phase_indices))
         self.gamma[:] = 1.5
         for i in range(len(self.phase_indices)):
             self.gamma[i,i] = 0
-        self.sigma = interface_energy
+        self._sigma = interface_energy
         self.T = temperature
         self.l = interface_width
         self.Vm = molar_volume
@@ -54,14 +55,18 @@ l : float
         self.time = 0
         self.print_newton = False
         self.min_timestep = 1e-7
+        self.anisotropy = None
 
-    @property
-    def kappa(self) -> float:
+    def set_timestep(self, dt: float):
+        self.dt.Set(dt)
+        self._user_timestep = dt
+
+    def kappa(self, etas=None) -> ngs.CF | float:
         for i in range(len(self.phase_indices)):
             for j in range(i+1, len(self.phase_indices)):
                 if self.gamma[i,j] != 1.5:
                     raise NotImplementedError("TODO: implement for gamma != 1.5, gamma = " + str(self.gamma))
-        return 3/4 * self.sigma * self.l
+        return 3/4 * self.sigma(etas) * self.l
 
     def set_gamma(self, phase1: Phase, phase2: Phase, gamma: float):
         self.gamma[self.phase_indices[phase1], self.phase_indices[phase2]] = gamma
@@ -77,19 +82,30 @@ l : float
     def h(self, etas) -> list[ngs.CoefficientFunction]:
         return [eta**2 / sum(etai**2 for etai in etas) for eta in etas]
 
-    @property
-    def m(self) -> float:
-        return 6 * self.sigma/self.l
+    def sigma(self, etas: list[ngs.CoefficientFunction] | None = None) \
+            -> ngs.CoefficientFunction | float:
+        if self.anisotropy is not None and etas is not None:
+            assert len(self.phases) == 2, "Anisotropy only implemented for two phases"
+            getas = ngs.Grad(etas)
+            getas0 = getas[0,:]
+            theta = ngs.IfPos(ngs.Norm(getas0),
+                              ngs.acos(getas0[1]/ngs.Norm(getas0)),
+                              0) - self.anisotropy["theta0"]
+            return self._sigma * ngs.sqrt(ngs.sin(theta)**2 + self.anisotropy["epsilon"]**2 * ngs.cos(theta)**2)
+        return self._sigma
+
+    def m(self, etas=None) -> ngs.CF | float:
+        return 6 * self.sigma(etas)/self.l
 
     def get_multiwell_energy(self, etas : list[ngs.CoefficientFunction]) \
             -> ngs.CoefficientFunction:
-        return ngs.CF(self.m * (sum((eta**4/4-eta**2/2) for eta in etas) + sum(sum(self.gamma[i,j] * eta1**2 * eta2**2 for j,eta1 in enumerate(etas) if j > i) for i,eta2 in enumerate(etas)) + 0.25))
+        return ngs.CF(self.m(etas) * (sum((eta**4/4-eta**2/2) for eta in etas) + sum(sum(self.gamma[i,j] * eta1**2 * eta2**2 for j,eta1 in enumerate(etas) if j > i) for i,eta2 in enumerate(etas)) + 0.25))
 
     def get_gradient_energy(self, etas: list[ngs.CoefficientFunction]) \
             -> ngs.CoefficientFunction:
         if isinstance(etas, tuple):
-            return ngs.CF(self.kappa/2 * sum(ngs.InnerProduct(ngs.grad(eta), ngs.grad(eta)) for eta in etas))
-        return self.kappa/2 * ngs.InnerProduct(ngs.grad(etas), ngs.grad(etas))
+            return ngs.CF(self.kappa(etas)/2 * sum(ngs.InnerProduct(ngs.grad(eta), ngs.grad(eta)) for eta in etas))
+        return self.kappa(etas)/2 * ngs.InnerProduct(ngs.grad(etas), ngs.grad(etas))
 
     def get_chemical_energy(self, etas: list[ngs.CoefficientFunction],
                             potentials: list[ngs.CoefficientFunction]) \
@@ -135,7 +151,7 @@ l : float
         for phase, h in zip(self.phases, self.h(etas)):
             concentrations = phase.get_concentrations(self.components,
                                                       potentials, self.T)
-          
+
             for comp, concentration in concentrations.items():
                 c[comp] += h * concentration
         return c
@@ -168,6 +184,8 @@ l : float
         if self.mass_conservation:
             self.gfcs = self.gfw[1]
             self.gfw = self.gfw[0]
+        else:
+            self.gfw = self.gfw[0]
         self.gf_old = ngs.GridFunction(self.fes)
         gfw_old = self.gf_old.components[:-1]
         gfetas_old = self.gf_old.components[-1]
@@ -180,7 +198,7 @@ l : float
         self.a = ngs.BilinearForm(self.fes)
         self.a += 1/self.dt * (etas-gfetas_old) * detas * ngs.dx
         self.a += self.L * (omega * ngs.dx).Diff(etas, detas)
-        
+
         # TODO: Implement for multiple components
         list_etas = [etai for etai in etas]
         concentrations = self._get_concentrations(list_etas, w)
@@ -195,12 +213,15 @@ l : float
         else:
             chi = self.get_chi(etas, w)
             Dchi = self.get_D_times_chi(etas, w)
-            self.a += self.Vm * chi * 1/self.dt * (w-gfw_old) * dw * ngs.dx
-            self.a += self.Vm * Dchi * ngs.InnerProduct(ngs.grad(w),ngs.grad(dw)) * ngs.dx
+            self.a += self.Vm * chi * 1/self.dt * (w[0]-gfw_old[0]) * dw * ngs.dx
+            self.a += self.Vm * Dchi * ngs.InnerProduct(ngs.grad(w[0]),ngs.grad(dw[0])) * ngs.dx
             rho = 1/self.Vm * concentrations[self.components[0]]
             for etai in list_etas:
                 etai.MakeVariable()
             self.a += self.Vm * sum(rho.Diff(etai) * 1/self.dt * (etai - etai_old) for etai, etai_old in zip(list_etas, gfetas_old.components)) * dw * ngs.dx
+
+    def set_interface_anisotropy(self, theta0: float, epsilon: float):
+        self.anisotropy = { "theta0" : theta0, "epsilon" : epsilon }
 
     def get_concentrations(self) -> dict[Component,ngs.CoefficientFunction]:
         if self.mass_conservation:
@@ -258,6 +279,9 @@ Initial conditions for phase. For components, for each phase an initial conditio
         try:
             solver.Solve(maxerr=1e-9, printing=self.print_newton, callback=callback)
             self.time += self.dt.Get()
+            # if self._user_timestep is not None and self.dt.Get() < self._user_timestep:
+            #     self.dt.Set(min(self.dt.Get()*2, self._user_timestep))
+            #     print("Increase timestep to:", self.dt.Get())
         except NewtonNotConverged as e:
             if self.dt.Get() > self.min_timestep:
                 self.dt.Set(self.dt.Get()/2)
@@ -266,7 +290,7 @@ Initial conditions for phase. For components, for each phase an initial conditio
                 self.do_timestep()
             else:
                 raise e
-        
+
     def solve(self, endtime, callback=None):
         with ngs.TaskManager():
             while self.time < endtime * (1-1e-6):
@@ -274,5 +298,3 @@ Initial conditions for phase. For components, for each phase an initial conditio
                 if callback is not None:
                     callback()
                 self.time += self.dt.Get()
-
-
