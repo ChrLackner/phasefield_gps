@@ -1,12 +1,44 @@
 import ngsolve as ngs
 
+def argmax2(x,f):
+    return ngs.IfPos(ngs.Norm(x[1])-1e-6-ngs.Norm(x[0]),
+                     ngs.CF((x[1],f[1])),
+                     ngs.CF((x[0],f[0])))
+
+def argmax(x,f):
+    res = argmax2(x[0:2], f[0:2])
+    for i in range(2, len(x)):
+        res = argmax2(ngs.CF((res[0], x[i])), ngs.CF((res[1], f[i])))
+    return res
+
 # Gas constant
 R = 8.314 # J/mol/K
 
 class Phase:
-    def __init__(self, name: str, diffusion_coefficient: float):
+    def __init__(self, name: str, diffusion_coefficient: float,
+                 surface_energies=None):
         self.names = name
         self.D = diffusion_coefficient
+        self.surface_energies = surface_energies
+
+    def get_surface_energy(self, other_phase, interface_normal) -> float | ngs.CF:
+        assert self.surface_energies is not None, "Surface energies not defined!"
+        if isinstance(self.surface_energies, dict):
+            phase_se = self.surface_energies[other_phase]
+            if isinstance(phase_se, dict):
+                if interface_normal is None:
+                    raise Exception("Interface normal must be given for multi-component systems!")
+                if interface_normal == False:
+                    return list(phase_se.values())[0]
+                nif = ngs.Norm(interface_normal)
+                if_normal = ngs.IfPos(nif, 1/( nif * (1+1e-6)) * interface_normal, ngs.CF((1,0)))
+                ips = [ngs.InnerProduct(if_normal, 1/ngs.Norm(ngs.CF(direction)) * ngs.CF(direction)) for direction in phase_se.keys()]
+                energies = list(phase_se.values())
+                amax = argmax(ips, energies)
+                theta = ngs.acos(amax[0])
+                return ngs.IfPos(nif-100, amax[1] * ngs.sqrt(ngs.sin(theta)**2 + self.surface_energies["kappa"]**2 * ngs.cos(theta)**2), energies[0])
+            return phase_se
+        return self.surface_energies
 
     def get_concentrations(self, components, potentials, T):
         assert len(components) < 3, "TODO: implement for more than two components"

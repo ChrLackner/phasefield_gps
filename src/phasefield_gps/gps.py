@@ -84,32 +84,41 @@ l : float
 
     def sigma(self, etas: list[ngs.CoefficientFunction] | None = None) \
             -> ngs.CoefficientFunction | float:
-        if self.anisotropy is not None and etas is not None:
-            assert len(self.phases) == 2, "Anisotropy only implemented for two phases"
-            getas = ngs.Grad(etas)
-            getas0 = getas[0,:]
-            theta = ngs.IfPos(ngs.Norm(getas0),
-                              ngs.acos(getas0[1]/ngs.Norm(getas0)),
-                              0) - self.anisotropy["theta0"]
-            return self._sigma * ngs.sqrt(ngs.sin(theta)**2 + self.anisotropy["epsilon"]**2 * ngs.cos(theta)**2)
-        return self._sigma
+        # TODO: implement for more than 2 phases
+        sigma = self.phases[1].\
+            get_surface_energy(self.phases[0],
+                               # (None if etas is None else ngs.grad(etas)[0,:]))
+                               # (None if etas is None else ngs.grad(self.gfetas)[0,:]))
+                               False if etas == False else ngs.Grad(self.gfetas_old)[0,:])
+        # if etas is not None:
+        #     ngs.Draw(ngs.grad(self.gfetas)[0,:], self.mesh, "grad")
+        # ngs.Draw(sigma, self.mesh, "sigma")
+        return sigma
 
     def m(self, etas=None) -> ngs.CF | float:
         return 6 * self.sigma(etas)/self.l
 
-    def get_multiwell_energy(self, etas : list[ngs.CoefficientFunction]) \
+    def get_multiwell_energy(self, etas : list[ngs.CoefficientFunction] | None = None) \
             -> ngs.CoefficientFunction:
+        if etas is None:
+            etas = self.gfetas
         return ngs.CF(self.m(etas) * (sum((eta**4/4-eta**2/2) for eta in etas) + sum(sum(self.gamma[i,j] * eta1**2 * eta2**2 for j,eta1 in enumerate(etas) if j > i) for i,eta2 in enumerate(etas)) + 0.25))
 
-    def get_gradient_energy(self, etas: list[ngs.CoefficientFunction]) \
+    def get_gradient_energy(self, etas: list[ngs.CoefficientFunction] | None = None) \
             -> ngs.CoefficientFunction:
+        if etas is None:
+            etas = self.gfetas
         if isinstance(etas, tuple):
             return ngs.CF(self.kappa(etas)/2 * sum(ngs.InnerProduct(ngs.grad(eta), ngs.grad(eta)) for eta in etas))
         return self.kappa(etas)/2 * ngs.InnerProduct(ngs.grad(etas), ngs.grad(etas))
 
-    def get_chemical_energy(self, etas: list[ngs.CoefficientFunction],
-                            potentials: list[ngs.CoefficientFunction]) \
+    def get_chemical_energy(self, etas: list[ngs.CoefficientFunction] | None = None,
+                            potentials: list[ngs.CoefficientFunction] | None = None) \
                             -> ngs.CoefficientFunction:
+        if etas is None:
+            etas = self.gfetas
+        if potentials is None:
+            potentials = self.gfw
         omega_chem = ngs.CF(0)
         hs = self.h(etas)
         for phase, h in zip(self.phases, hs):
@@ -120,10 +129,6 @@ l : float
     def get_energy(self, etas: list[ngs.CoefficientFunction] | None = None,
                    potentials: list[ngs.CoefficientFunction] | None = None) \
                    -> ngs.CoefficientFunction:
-        if etas is None:
-            etas = self.gfetas
-        if potentials is None:
-            potentials = self.gfw
         return self.get_multiwell_energy(etas) + \
             self.get_gradient_energy(etas) + \
             self.get_chemical_energy(etas, potentials)
@@ -188,7 +193,7 @@ l : float
             self.gfw = self.gfw[0]
         self.gf_old = ngs.GridFunction(self.fes)
         gfw_old = self.gf_old.components[:-1]
-        gfetas_old = self.gf_old.components[-1]
+        self.gfetas_old = self.gf_old.components[-1]
         if self.mass_conservation:
             gfcs_old = gfw_old[1]
             gfw_old = gfw_old[0]
@@ -196,32 +201,30 @@ l : float
         omega = self.get_energy(etas, w)
 
         self.a = ngs.BilinearForm(self.fes)
-        self.a += 1/self.dt * (etas-gfetas_old) * detas * ngs.dx
-        self.a += self.L * (omega * ngs.dx).Diff(etas, detas)
+        forms = 1/self.dt * (etas-self.gfetas_old) * detas * ngs.dx
+        forms += self.L * (omega * ngs.dx).Diff(etas, detas)
 
         # TODO: Implement for multiple components
         list_etas = [etai for etai in etas]
         concentrations = self._get_concentrations(list_etas, w)
         if self.mass_conservation:
             for ci, dci, gfci_old in zip(c, dc, [gfcs_old]):
-                self.a += 1/self.dt * (ci-gfci_old) * dci * ngs.dx
+                forms += 1/self.dt * (ci-gfci_old) * dci * ngs.dx
             Dchi = self.get_D_times_chi(etas, w)
             for wi, dci in zip(w, dc):
-                self.a += self.Vm * Dchi * ngs.InnerProduct(ngs.grad(wi),ngs.grad(dci)) * ngs.dx
+                forms += self.Vm * Dchi * ngs.InnerProduct(ngs.grad(wi),ngs.grad(dci)) * ngs.dx
             for ci, dwi in zip(c, dw):
-                self.a += (concentrations[self.components[0]] - ci) * dwi * ngs.dx
+                forms += (concentrations[self.components[0]] - ci) * dwi * ngs.dx
         else:
             chi = self.get_chi(etas, w)
             Dchi = self.get_D_times_chi(etas, w)
-            self.a += self.Vm * chi * 1/self.dt * (w[0]-gfw_old[0]) * dw * ngs.dx
-            self.a += self.Vm * Dchi * ngs.InnerProduct(ngs.grad(w[0]),ngs.grad(dw[0])) * ngs.dx
+            forms += self.Vm * chi * 1/self.dt * (w[0]-gfw_old[0]) * dw * ngs.dx
+            forms += self.Vm * Dchi * ngs.InnerProduct(ngs.grad(w[0]),ngs.grad(dw[0])) * ngs.dx
             rho = 1/self.Vm * concentrations[self.components[0]]
             for etai in list_etas:
                 etai.MakeVariable()
-            self.a += self.Vm * sum(rho.Diff(etai) * 1/self.dt * (etai - etai_old) for etai, etai_old in zip(list_etas, gfetas_old.components)) * dw * ngs.dx
-
-    def set_interface_anisotropy(self, theta0: float, epsilon: float):
-        self.anisotropy = { "theta0" : theta0, "epsilon" : epsilon }
+            forms += self.Vm * sum(rho.Diff(etai) * 1/self.dt * (etai - etai_old) for etai, etai_old in zip(list_etas, self.gfetas_old.components)) * dw * ngs.dx
+        self.a += forms.Compile() #True, True)
 
     def get_concentrations(self) -> dict[Component,ngs.CoefficientFunction]:
         if self.mass_conservation:
@@ -242,7 +245,7 @@ Initial conditions for phase. For components, for each phase an initial conditio
             self._setup()
         if phases is not None:
             for phase, ic in phases.items():
-                self.gfetas.components[self.phase_indices[phase]].Set(ic)
+                self.gfetas.components[self.phase_indices[phase]].Set(ic, dual=True)
         if components is not None:
             tmp = self.gfw.vec.CreateVector()
             tmp[:] = 0
@@ -257,15 +260,16 @@ Initial conditions for phase. For components, for each phase an initial conditio
                 potentials = phase.get_potentials(concentrations,
                                                  self.components[-1],
                                                  self.T)
-                self.gfw.Set(h * potentials[self.components[0]])
+                self.gfw.Set(h * potentials[self.components[0]], dual=True)
                 tmp += self.gfw.vec
                 if self.mass_conservation:
-                    self.gfcs.Set(h * concentrations[self.components[0]])
+                    self.gfcs.Set(h * concentrations[self.components[0]], dual=True)
                     tmp2.data += self.gfcs.vec
             self.gfw.vec.data = tmp
             if self.mass_conservation:
                 self.gfcs.vec.data = tmp2
 
+    @ngs.TimeFunction
     def do_timestep(self):
         if not hasattr(self, "a"):
             self._setup()
@@ -291,10 +295,9 @@ Initial conditions for phase. For components, for each phase an initial conditio
             else:
                 raise e
 
+    @ngs.TimeFunction
     def solve(self, endtime, callback=None):
-        with ngs.TaskManager():
-            while self.time < endtime * (1-1e-6):
-                self.do_timestep()
-                if callback is not None:
-                    callback()
-                self.time += self.dt.Get()
+        while self.time < endtime * (1-1e-6):
+            self.do_timestep()
+            if callback is not None:
+                callback()
