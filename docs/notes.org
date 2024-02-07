@@ -1,0 +1,301 @@
+
+#+TITLE: Notes on Grand Potential Formulation
+#+AUTHOR: Christopher Lackner
+#+STARTUP: latexpreview
+#+cite_export: csl
+#+LATEX_HEADER: \usepackage{my_defines}
+
+
+todo: Document strict mass conservation
+todo: Anisotropy
+
+* Grand Potential
+
+Most of this is taken from [cite:@PhysRevE.98.023309].
+
+This phase-field model describes $N$ possible phases and $K$ chemical species.
+The individual phases are represented y a set of nonconserved order parameters
+$\eta_{i}$, $i=1,\ldots,N$.
+
+We track the number density $\rho$ of each solute species at each position.
+Assuming each chemical species has the same atomic volume $V_a$, $K-1$ variables are required and the $K$ species is considered the solvent.
+The number density of species $k$ is related to its local molar fraction $c_k$ by
+
+$$
+\rho_k = \frac{c_k}{V_m}
+$$
+
+with $V_m$ the molar volume.
+
+The total grand potential $\Omega$ of the system is defined as
+
+$$
+\Omega = \int_V (\omega_{mw} + \omega_{grad} + \omega_{chem}) \, dx
+$$
+
+** Multiwell potential
+
+
+[cite:@PhysRevB.78.024113] proposed a homogeneous free energy $\omega_{mw}$ of the form 
+
+$$
+\omega_{mw} = m \left(\frac{1}{4} + \sum_{i=1}^N \left( \frac{\eta_i^4}{4} - \frac{\eta_i^2}{2} \right) + \sum_{i=1}^N \sum_{j=i+1}^N \gamma_{ij} \eta_i^2 \eta_j^2 \right)
+$$
+
+It has multiple degenerate minima located at
+
+$$
+(\eta_1, \ldots, \eta_N) = ( \pm 1, 0, \ldots, 0 ), ( 0, \pm 1, \ldots, 0), \ldots, ( 0, \ldots, 0, \pm 1)
+$$
+
+Interfacial anisotropy can be included by making $\gamma_{ij}$ dependent on the interface orientation.
+
+** The gradient contribution
+
+The gradient contribution $\omega_{grad}$ is defined as
+
+$$
+\omega_{grad} = \frac{\kappa}{2} \sum_{i=1}^N \left| \nabla \eta_i \right|^2
+$$
+
+** The chemical contribution
+
+The chemical contribution $\omega_{chem}$ is defined as
+
+$$
+\omega_{chem} = \sum_{i=1}^N h_i \omega_i
+$$
+
+with $h_i$ an interpolation function for phase $i$ and $\omega_i$ the grand potential density of phase $i$.
+
+The interpolation function $h_i$ is defined as [cite:@moelansQuantitativeThermodynamicallyConsistent2011]
+
+$$
+h_i = \frac{\eta_i^2}{\sum_{j=1}^N \eta_j^2}
+$$
+
+The grand potential density $\omega_i$ of phase $i$ is defined as
+
+$$
+\omega_i = \frac{f_i}{V_m} - \sum_{k=1}^{K-1} \rho_k \mu_{k}
+$$
+
+where $f_i$ is the Helmholtz free energy density of phase $i$ and $\mu_k$ is the chemical potential difference between species $k$ and the solvent.
+
+** Free energy functions
+
+*** Ideal solution model
+
+\todo{Binary for now, generalize later. -> only one species with concentration $c$ and solvent $1-c$.}
+
+In an ideal solution model, the free energy is a weighted average of the pure substance free energies of A and B plus an entropy of mixing term [cite:@PhysRevE.84.031601]:
+
+$$
+f_i(T,c) = (1-c) f_i^A(T) + c f_i^B(T) + RT \left[ c \ln c + (1-c) \ln (1-c) \right]
+$$
+with $c$ the atomic fraction of $B$. ($f_i$ in $J/\text{mol}$)
+
+With $c_k$ the concentration of the $k$-th species for $k=1 \dots K-1 and
+
+$$
+c_K = 1 - \sum_{k=1}^{K-1} c_k
+$$
+
+\begin{align*}
+f_i(T,c) =& \sum_{k=1}^{K} c_k f_i^k(T) + RT \sum_{k=1}^{K} c_k \ln c_k
+\end{align*}
+
+
+With defining $\epsilon_i^k = f_i^k(T) - f_i^K(T)$, the chemical potential is
+
+
+$$
+\mu_k = \frac{\partial f_i(T,c)}{\partial c_k} = \epsilon_i^k + R T \ln{\left(\frac{c_k}{1-\sum_{l=1}^{K-1} c_l}\right)} = \epsilon_i^k + R T \ln{\left(\frac{c_k}{c_K}\right)}
+$$
+
+with $\mu$ in $J/\text{mol}$.
+
+this can be inverted to yield the concentration in each phase as a function of $\mu$:
+
+with $\alpha_i^k := \frac{\mu_k - \epsilon_i^k}{R T}$
+
+$$
+c_k^i(\mu_k) = \frac{\left(1-\sum_{l=1, l != k}^{K-1} c_l^i \right) e^{\alpha_i^k}}{1 + e^{\alpha_i^k}}
+$$.
+
+This can be used to define the interpolated composition and susceptibility:
+
+$$
+c_k(\eta, \mu_k) = \sum_{i=1}^N h_i(\eta) c_k^i(\eta, \mu_k)
+$$
+
+$$
+\chi_{kl}(\eta, \mu) = \frac{\partial \rho_k}{\partial \mu_l} = \frac{1}{V_m R T} \sum_{i=1}^N h_i(\eta) c_i(\mu) (1-c_i(\mu))
+$$
+
+for details see [[*Derivation of susceptibility][Derivation of susceptibility]].
+
+* Evolution Equations
+
+** Phase order parameters
+
+Each order parameter $\eta_i$ evolves by an Allen-Cahn equation
+
+$$
+\frac{\partial \eta_i}{\partial t} = -L \frac{\delta \Omega}{\delta \eta_i}
+$$
+
+with
+
+$$
+L = \frac{ \sum_{i=1}^N \sum_{j=1 i!=j}^N L_{ij} \eta_i^2 \eta_j^2 }{ \sum_{i=1}^N
+\sum_{j=1 i!=j}^N \eta_i^2 \eta_j^2 }
+$$
+
+with $L_{ij}$ a mobility coefficient for the interface between phases $i$ and $j$.
+
+** Chemical potentials
+
+In the case when all interdiffusivities are zero we get
+
+$$
+\chi_{kk} \frac{\partial \mu_k}{\partial t} = \nabla \cdot M_{kk} \nabla \mu_k - \sum_{i=1}^N \frac{\partial \rho_k}{\partial \eta_i} \frac{\partial \eta_i}{\partial t}
+$$
+
+with $M_{kk} = D \chi_{kk}$, $D$ the diffusivity and $\chi_{kl}$ the susceptibility defined as
+$$
+\chi_{kl} = \frac{\partial \rho_k}{\partial \mu_l}
+$$
+
+for details see [[*Derivation of evolution equation for chemical potential][Derivation of evolution equation for chemical potential]].
+
+* Calculation of Model Parameters
+
+from [cite:@PhysRevB.78.024113]:
+
+This only holds for $\gamma \approx 1.5$!
+$$
+\kappa = \sigma_{gb} l_{gb} \frac{\sqrt{f_{0,\text{interf}}(\gamma)}}{g(\gamma)} \approx
+\frac{3}{4} \sigma_{gb} l_{gb}
+$$
+
+$$
+L = \frac{mu_{gb}}{l_{gb}} \frac{g(\gamma)}{\sqrt{f_{0,\text{interf}}(\gamma)}} \approx \frac{4}{3} \frac{\mu_{gb}}{l_{gb}}
+$$
+
+$$
+m = \frac{\sigma_{gb}}{l_{gb}} \frac{1}{\sqrt{f_{0,\text{interf}}(\gamma)}} \approx \frac{3}{4} \frac{1}{f_{0, \text{saddle}}(\gamma)} \frac{\sigma_{gb}}{l_{gb}} = 6 \frac{\sigma_{gb}}{l_{gb}}
+$$
+
+* Anisotropy
+
+From [cite:@PhysRevE.48.2016]:
+
+We define the diffusion coefficient $\kappa$ to be dependent on the orientation of the interface: $\kappa = \kappa(\theta)$ with $\theta$ the angle of the interface:
+
+$$
+\theta_i = \arctan{\left(\frac{\partial_y \eta_i}{\partial_x \eta_i}\right)}
+$$
+
+* Appendix
+
+** Inversion of chemical potential
+
+\begin{align*}
+\mu_k = \epsilon_i^k + R T \ln{\left(\frac{c_k}{1-\sum_{l=1}^{K-1} c_l}\right)} = \epsilon_i^k + R T \ln{\left(\frac{c_k}{c_K}\right)} \\
+\frac{\mu_k - \epsilon_i^k}{R T} = \ln{\left(\frac{c_k}{c_K}\right)} \\
+\exp{\frac{\mu_k - \epsilon_i^k}{R T}} = \frac{c_k}{c_K} \\
+c_k = c_K \exp{\frac{\mu_k - \epsilon_i^k}{R T}}
+\end{align*}
+
+using 
+$$
+c_K = 1 - \sum_{l=1}^{K-1} c_l
+$$
+
+and defining $\alpha_i^k := e^{\frac{\mu_k - \epsilon_i^k}{R T}}$ we get
+
+\begin{align*}
+\frac{1+\alpha_i^k}{\alpha_i^k} c_k = 1-\sum_{l=1, l!=k}^{K-1} c_l
+\end{align*}
+
+
+** Derivation of susceptibility 
+
+\begin{align*}
+\chi(\eta, \mu) = \frac{\partial \rho}{\partial \mu} = \frac{1}{V_m} \frac{\partial c(\eta, \mu)}{\partial \mu} = \frac{1}{V_m} \sum_{i=1}^N h_i(\eta) \frac{\partial c_i(\mu)}{\partial \mu} = \\
+ = \frac{1}{V_m} \sum_{i=1}^N h_i(\eta) \frac{\partial}{\partial \mu}\left( \frac{\exp{\frac{\mu - \epsilon_i}{R T}}}{1 + \exp{\frac{\mu - \epsilon_i}{R T}}} \right)
+\end{align*}
+
+define
+$$
+\alpha_i := \frac{\mu - \epsilon_i}{R T}
+$$
+
+then
+
+\begin{align*}
+\frac{\partial c_i}{\partial \mu} &= \frac{\partial c_i}{\partial \alpha_i} \frac{\partial \alpha_i}{\partial \mu} = \frac{\exp{\alpha_i} (1+\exp{\alpha_i}) - \exp{\alpha_i} \exp{\alpha_i}}{(1+\exp{\alpha_i})^2} \frac{1}{R T} = \\
+&= \frac{1}{R T} \frac{\exp{\alpha_i}}{(1+\exp{\alpha_i})^2}
+\end{align*}
+and
+
+$$
+c_i (1-c_i) = \frac{\exp{\alpha_i}}{1+\exp{\alpha_i}} \frac{1+\exp{\alpha_i} - \exp{\alpha_i}}{1+\exp{\alpha_i}} = \frac{\exp{\alpha_i}}{(1+\exp{\alpha_i})^2}
+$$
+
+therefore
+
+$$
+\chi(\eta, \mu) = \frac{1}{V_m R T} \sum_{i=1}^N h_i(\eta) c_i(\mu) (1-c_i(\mu))
+$$
+
+
+
+
+** Derivation of evolution equation for chemical potential
+
+From the generalized diffusion equation
+
+$$
+\frac{\partial \rho_k}{\partial t} = \nabla \cdot \sum_{k=1}^{K-1} M_k \nabla \mu_k
+$$
+
+where mobility coefficient $M_k$ is of dimensions (energy x length x time$)^{-1}$
+From this we need to derive a evolution equation for the chemical potential $\mu_k$.
+
+Note that in typical evaolution equation
+$$
+\frac{\partial c}{\partial t} = \nabla \cdot M_k \nabla \mu_k
+$$
+the mobility coefficient $M_k$ is of dimensions length x (energy x time)$^{-1}$.
+
+The time derivative of the density can be expressed as
+
+$$
+\frac{\partial \rho_k}{\partial t} = \sum_{i=1}^{K-1} \frac{\partial \rho_k}{\partial \mu_i} \frac{\partial \mu_i}{\partial t} + \sum_{i=1}^{N} \frac{\partial \rho_k}{\partial \eta_i} \frac{\partial \eta_i}{\partial t}
+$$
+
+If (as in our case)
+
+$$
+\frac{\partial \rho_k}{\partial \mu_i} = \delta_{ik}
+$$
+
+then
+
+$$
+\frac{\partial \rho_k}{\partial t} = \chi_{kk} \frac{\partial \mu_k}{\partial t} + \sum_{i=1}^{N} \frac{\partial \rho_k}{\partial \eta_i} \frac{\partial \eta_i}{\partial t}
+$$
+
+resulting in the evolution equation
+
+$$
+\chi_{kk} \frac{\partial \mu_k}{\partial t} = \nabla \cdot M_k \nabla \mu_k - \sum_{i=1}^N \frac{\partial \rho_k}{\partial \eta_i} \frac{\partial \eta_i}{\partial t}
+$$
+
+
+
+* Bibliography
+
+#+print_bibliography:
