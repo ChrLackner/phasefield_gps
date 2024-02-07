@@ -57,26 +57,29 @@ concentrations = model.get_concentrations()
 for comp, conc in concentrations.items():
     Draw(1e-4 * conc, mesh, f"{comp.name}")
 
+potentials = model.gfw
+Draw(potentials, mesh, "potential")
+
 import numpy as np
 
 x_vals = np.linspace(-0.5e-3, 0.5e-3, 100)
 y_vals = 0.5e-4
 mesh_pnts = mesh(x_vals, y_vals)
 
-# funcs_to_plot = { "concentration" : gfc,
-#                   "liquid" : liquid,
-#                   "solid" : solid,
+funcs_to_plot = { "concentration" : concentrations,
+                   "liquid" : liquid,
+                   "solid" : solid,
 #                   "eta1" : gfetas[0],
 #                   "eta2" : gfetas[1],
-#                   "potential" : gfw }
-                  
+                   "potential" : potentials}
+                 
+vals = { name : [func(mesh_pnts)] for name, func in funcs_to_plot.items() }
+time = 0
+time_vals = [time]
 
-# vals = { name : [func(mesh_pnts)] for name, func in funcs_to_plot.items() }
-# time = 0
-# time_vals = [time]
-
-# import matplotlib.pyplot as plt
-# interface_point = (0.4e-3, 0)
+import matplotlib.pyplot as plt
+interface_point = (0.4e-3, 0)
+# vol = Integrate(1, mesh) 
 
 def callback():
     
@@ -90,4 +93,19 @@ with ngs.TaskManager():
     model.set_timestep(1)
     model.solve(100, callback=callback)
 
+  
+  
+for i in range(10000):
 
+  #c_tot = Integrate(concentrations, mesh) / vol
+  if i % 20 == 19:
+        # if i % 2 == 0:
+            time_vals.append(time)
+            for name, func in funcs_to_plot.items():
+                vals[name].append(func(mesh_pnts))
+                plt.clf()
+                for t,c in zip(time_vals, vals[name]):
+                    plt.plot(x_vals, c, label=f"t {t}")
+                # plt.legend()
+                plt.savefig(f"{name}.png")
+print("c = ", concentrations)
