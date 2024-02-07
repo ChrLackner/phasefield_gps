@@ -3,6 +3,25 @@ import ngsolve as ngs
 from .phase import Phase
 from .component import Component
 
+class CGWrapper:
+    def __init__(self, a, *args, **kwargs):
+        self.a = a
+        self.args = args
+        self.kwargs = kwargs
+        self.cg = None
+
+    def ensure_cg(self):
+        if self.cg is None:
+            self.cg = ngs.krylovspace.CGSolver(self.a.mat, *self.args, **self.kwargs)
+
+    def __getattr__(self, __name: str):
+        self.ensure_cg()
+        return self.cg.__getattribute__(__name)
+
+    def __mul__(self, other):
+        self.ensure_cg()
+        return self.cg * other
+
 class NewtonNotConverged(Exception):
     def __init__(self):
         super().__init__("Newton method did not converge!")
@@ -225,6 +244,7 @@ l : float
                 etai.MakeVariable()
             forms += self.Vm * sum(rho.Diff(etai) * 1/self.dt * (etai - etai_old) for etai, etai_old in zip(list_etas, self.gfetas_old.components)) * dw * ngs.dx
         self.a += forms.Compile() #True, True)
+        # self.c = ngs.Preconditioner(self.a, "bddc")
 
     def get_concentrations(self) -> dict[Component,ngs.CoefficientFunction]:
         if self.mass_conservation:
@@ -278,7 +298,9 @@ Initial conditions for phase. For components, for each phase an initial conditio
             import math
             if math.isnan(err):
                 raise NewtonNotConverged()
+        # lin_solver = CGWrapper(self.a, self.c)
         solver = ngs.nonlinearsolvers.NewtonSolver(self.a, self.gf,
+                                                   # solver=lin_solver)
                                                    inverse="pardiso")
         try:
             solver.Solve(maxerr=1e-9, printing=self.print_newton, callback=callback)

@@ -31,7 +31,7 @@ class Phase:
                 if interface_normal == False:
                     return list(phase_se.values())[0]
                 nif = ngs.Norm(interface_normal)
-                if_normal = ngs.IfPos(nif, 1/( nif * (1+1e-6)) * interface_normal, ngs.CF((1,0)))
+                if_normal = ngs.IfPos(nif, 1/( nif * (1+1e-6)) * interface_normal, ngs.CF((1,0) if interface_normal.dim == 2 else (1,0,0)))
                 ips = [ngs.InnerProduct(if_normal, 1/ngs.Norm(ngs.CF(direction)) * ngs.CF(direction)) for direction in phase_se.keys()]
                 energies = list(phase_se.values())
                 amax = argmax(ips, energies)

@@ -2,11 +2,21 @@ import ngsolve as ngs
 from ngsolve.meshes import *
 from phasefield_gps import *
 
+dim = 2
 factor = 1e4
-directional_surface_energies = { (1,0) : 2.45 * factor,
-                                 (0,1) : 0.5 * 2.45 * factor,
-                                 (1,1) : 0.83 * 2.45 * factor,
-                                 (-1,1) : 0.83 * 2.45 * factor }
+if dim == 3:
+    directional_surface_energies = { (0,0,1) : 2.45 * factor,
+                                     (1,0,0) : 0.5 * 2.45 * factor,
+                                     (0,1,0) : 1.67 * 2.45 * factor,
+                                     (1,0,1) : 2.33 * 2.45 * factor,
+                                     (0,2,1) : 2.26 * 2.45 * factor,
+                                     (-1,0,1) : 2.33 * 2.45 * factor,
+                                     (0,-2,1) : 2.26 * 2.45 * factor }
+else:
+    directional_surface_energies = { (1,0) : 2.45 * factor,
+                                     (0,1) : 0.5 * 2.45 * factor,
+                                     (1,1) : 0.83 * 2.45 * factor,
+                                     (-1,1) : 0.83 * 2.45 * factor }
 print("directional_surface_energies", directional_surface_energies)
 liquid = Phase("liquid", diffusion_coefficient=3e-12)
 solid = Phase("solid", diffusion_coefficient=3e-16,
@@ -20,11 +30,21 @@ fayalite = IdealSolutionComponent(name="Fayalite",
                                   phase_energies={ liquid: -1980885,
                                                    solid: -1951843 })
 # mesh
-nx = 50
-ny = 50
-mesh = MakeStructured2DMesh(quads=True, nx=nx, ny=ny,
-                            periodic_x=False, periodic_y=False,
-                            mapping = lambda x,y: (1e-3*x-5e-4, 1e-3*y - 5e-4))
+nel = 30
+nx = nel
+ny = nel
+
+
+if dim == 3:
+    nz = nel
+    mesh = MakeStructured3DMesh(hexes=True, nx=nx, ny=ny, nz=nz,
+                                mapping= lambda x,y,z: (1e-3 * x-5e-4,
+                                                        1e-3 * y-5e-4,
+                                                        1e-3 * z-5e-4))
+else:
+    mesh = MakeStructured2DMesh(quads=True, nx=nx, ny=ny,
+                                periodic_x=False, periodic_y=False,
+                                mapping = lambda x,y: (1e-3*x-5e-4, 1e-3*y - 5e-4))
 
 model = GrandPotentialSolver(mesh=mesh,
                              components=[fosterite, fayalite],
@@ -36,7 +56,7 @@ model = GrandPotentialSolver(mesh=mesh,
                              interface_width=5e-5) # m
 model.order=2
 
-model.mass_conservation = False
+model.mass_conservation = True
 
 # initial conditions for phase
 # wenn ...(x+0).., dann genau Mitte (-0.5e-3..0..+0.5e-3). x+0.4e-3.. = verschiebt IF nach links
@@ -47,7 +67,10 @@ ic_concentrations[fayalite] = { liquid: 1-ic_concentrations[fosterite][liquid],
                                 solid: 1-ic_concentrations[fosterite][solid] }
 
 r = 10 * 1e-5
-rx = ngs.sqrt(ngs.x**2 + ngs.y**2) - r
+if dim == 3:
+    rx = ngs.sqrt(ngs.x**2 + ngs.y**2 + ngs.z**2) - r
+else:
+    rx = ngs.sqrt(ngs.x**2 + ngs.y**2) - r
 tanh = lambda x: ngs.sinh(x)/ngs.cosh(x)
 ic_liquid = 0.5 * (1 + tanh(ngs.sqrt(model.m(False)/model.kappa(False)) * rx))
 # ic_liquid = 0.5 * (1 + tanh(ngs.sqrt(model.m()/model.kappa()) * ngs.x))
@@ -57,18 +80,18 @@ model.set_initial_conditions({ liquid: ic_liquid,
                                solid: 1-ic_liquid },
                              components=ic_concentrations)
 
-Draw(1e-4 * model.get_phase(liquid), mesh, "liquid")
-Draw(1e-4 * model.get_phase(solid), mesh, "solid")
+Draw(model.get_phase(liquid), mesh, "liquid")
+Draw(model.get_phase(solid), mesh, "solid")
 # print(Integrate(omega(gfetas, gfw), mesh))
 concentrations = model.get_concentrations()
 for comp, conc in concentrations.items():
-    Draw(1e-4 * conc, mesh, f"{comp.name}")
+    Draw(conc, mesh, f"{comp.name}")
 
 import numpy as np
 
-x_vals = np.linspace(-0.5e-3, 0.5e-3, 100)
-y_vals = 0.5e-4
-mesh_pnts = mesh(x_vals, y_vals)
+# x_vals = np.linspace(-0.5e-3, 0.5e-3, 100)
+# y_vals = 0.5e-4
+# mesh_pnts = mesh(x_vals, y_vals)
 
 # funcs_to_plot = { "concentration" : gfc,
 #                   "liquid" : liquid,
@@ -88,9 +111,10 @@ timestep = 0
 def callback():
     global timestep
     timestep += 1
-    if timestep == 10:
-        model.set_timestep(0.1)
+    # if timestep % 10 == 0:
+    #     model.set_timestep(0.1)
     print(f"Time: {model.time}, energy: {ngs.Integrate(model.get_energy(), mesh)}, e_c = {ngs.Integrate(model.get_chemical_energy(), mesh)}, e_mw = {ngs.Integrate(model.get_multiwell_energy(),mesh)}, e_grad = {ngs.Integrate(model.get_gradient_energy(), mesh)}")
+    print("Solid part = ", ngs.Integrate(model.get_phase(solid), mesh) / ngs.Integrate(1, mesh))
     ngs.Redraw()
 
 model.print_newton = True
