@@ -3,7 +3,8 @@ from ngsolve.meshes import *
 from phasefield_gps import *
 
 liquid = Phase("liquid", diffusion_coefficient=3e-7)
-solid = Phase("solid", diffusion_coefficient=3e-12)
+solid = Phase("solid", diffusion_coefficient=3e-12,
+            surface_energies={ liquid : 2.45 }) # J/m**2
 
 fosterite = IdealSolutionComponent(name="Fosterite",
                                    phase_energies={ liquid: -2498560,
@@ -23,13 +24,12 @@ model = GrandPotentialSolver(mesh=mesh,
                              phases=[liquid, solid],
                              molar_volume=4.3e-5, # m**3/mol
                              interface_mobility=1e-13, # m**4/J/s
-                             interface_energy=2.45, # J/m**2
                              temperature=1923.15, # K
                              interface_width=5e-5) # m
 
 # model.set_interface_anisotropy(theta0=0, epsilon=0.2)
 
-model.mass_conservation = False
+model.mass_conservation = True
 
 # initial conditions for phase
 # wenn ...(x+0).., dann genau Mitte (-0.5e-3..0..+0.5e-3). x+0.4e-3.. = verschiebt IF nach links
@@ -43,8 +43,8 @@ ic_concentrations = { fayalite: { liquid: 0.999,
 ic_concentrations[fosterite] = { liquid: 1-ic_concentrations[fayalite][liquid],
                                  solid: 1-ic_concentrations[fayalite][solid] }
 
-print(model.m()/model.kappa())
-ic_liquid = 0.5 * tanh(ngs.sqrt(model.m()/model.kappa()) * (ngs.x-shift)) + 0.5
+print(model.m(False)/model.kappa(False))
+ic_liquid = 0.5 * tanh(ngs.sqrt(model.m(False)/model.kappa(False)) * (ngs.x-shift)) + 0.5
 model.set_initial_conditions({ liquid: ic_liquid,
                                solid: 1-ic_liquid },
                              components=ic_concentrations)
