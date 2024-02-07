@@ -29,6 +29,7 @@ fosterite = IdealSolutionComponent(name="Fosterite",
 fayalite = IdealSolutionComponent(name="Fayalite",
                                   phase_energies={ liquid: -1980885,
                                                    solid: -1951843 })
+
 # mesh
 nel = 30
 nx = nel
@@ -51,7 +52,6 @@ model = GrandPotentialSolver(mesh=mesh,
                              phases=[liquid, solid],
                              molar_volume=4.3e-5, # m**3/mol
                              interface_mobility=1e-13, # m**4/J/s
-                             interface_energy=2.45, # J/m**2
                              temperature=1923.15, # K
                              interface_width=5e-5) # m
 model.order=2

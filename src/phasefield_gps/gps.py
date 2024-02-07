@@ -30,7 +30,6 @@ class GrandPotentialSolver:
     def __init__(self, mesh: ngs.Mesh, components: list[Component],
                  phases: list[Phase], molar_volume: float,
                  interface_mobility: float,
-                 interface_energy: float,
                  temperature: float,
                  interface_width: float):
         """
@@ -66,7 +65,6 @@ l : float
         self.gamma[:] = 1.5
         for i in range(len(self.phase_indices)):
             self.gamma[i,i] = 0
-        self._sigma = interface_energy
         self.T = temperature
         self.l = interface_width
         self.Vm = molar_volume
