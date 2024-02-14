@@ -62,7 +62,7 @@ class Phase:
             solvent_energy = solvent.phase_energies[self]
             my_energy = comp.phase_energies[self]
             eps = my_energy - solvent_energy
-            potentials[comp] = eps + R * T * ngs.log(conc/(1-conc))
+            potentials[comp] = eps + R * T * ngs.IfPos(conc, ngs.IfPos(1-conc, ngs.log(conc/(1-conc)), 0), 0)
         return potentials
 
     def get_chemical_potential(self, components, potentials, T):
@@ -78,4 +78,6 @@ class Phase:
     def get_chi(self, components, potentials, T):
         concentrations = self.get_concentrations(components, potentials, T)
         assert len(components) == 2, "TODO: implement for more than two components"
-        return concentrations[components[0]] * (1-concentrations[components[0]])
+        c = concentrations[components[0]]
+        c = ngs.IfPos(c-1e-9, c, 1e-9)
+        return c * (1-c)
