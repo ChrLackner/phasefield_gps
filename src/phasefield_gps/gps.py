@@ -22,9 +22,15 @@ class CGWrapper:
         self.ensure_cg()
         return self.cg * other
 
-class NewtonNotConverged(Exception):
+class NonlinearException(Exception):
+    pass
+
+class NewtonNotConverged(NonlinearException):
     def __init__(self):
         super().__init__("Newton method did not converge!")
+class ErrorTooLarge(NonlinearException):
+    def __init__(self):
+        super().__init__("Timestepping error too large!")
 
 class GrandPotentialSolver:
     def __init__(self, mesh: ngs.Mesh, components: list[Component],
@@ -73,6 +79,8 @@ l : float
         self.print_newton = False
         self.min_timestep = 1e-7
         self.anisotropy = None
+        # self.timestepping_tolerance = 1e-4
+        self.timestepping_tolerance = None
 
     def set_timestep(self, dt: float):
         self.dt.Set(dt)
@@ -209,8 +217,11 @@ l : float
         else:
             self.gfw = self.gfw[0]
         self.gf_old = ngs.GridFunction(self.fes)
+        self._gf_coarse = ngs.GridFunction(self.fes)
         gfw_old = self.gf_old.components[:-1]
+        self._gfw_coarse = self._gf_coarse.components[:-1]
         self.gfetas_old = self.gf_old.components[-1]
+        self._gfetas_coarse = self._gf_coarse.components[-1]
         if self.mass_conservation:
             gfcs_old = gfw_old[1]
             gfw_old = gfw_old[0]
@@ -241,7 +252,7 @@ l : float
             for etai in list_etas:
                 etai.MakeVariable()
             forms += self.Vm * sum(rho.Diff(etai) * 1/self.dt * (etai - etai_old) for etai, etai_old in zip(list_etas, self.gfetas_old.components)) * dw * ngs.dx
-        self.a += forms.Compile() #True, True)
+        self.a += forms.Compile()
         # self.c = ngs.Preconditioner(self.a, "bddc")
 
     def get_concentrations(self) -> dict[Component,ngs.CoefficientFunction]:
@@ -301,16 +312,35 @@ Initial conditions for phase. For components, for each phase an initial conditio
                                                    # solver=lin_solver)
                                                    inverse="pardiso")
         try:
+            store_gf_old = self.gf_old.vec.Copy()
             solver.Solve(maxerr=1e-9, printing=self.print_newton, callback=callback)
+            if self.timestepping_tolerance is not None:
+                self._gf_coarse.vec.data = self.gf.vec
+                energy_coarse = self.get_energy(self._gfetas_coarse, self._gfw_coarse)
+                print("Energy on coarse: ", ngs.Integrate(energy_coarse, self.mesh))
+                self.dt.Set(self.dt.Get()/2)
+                self.gf.vec.data = self.gf_old.vec
+                solver.Solve(maxerr=1e-9, printing=self.print_newton, callback=callback)
+                self.gf_old.vec.data = self.gf.vec
+                solver.Solve(maxerr=1e-9, printing=self.print_newton, callback=callback)
+                energy_fine = self.get_energy()
+                tot_energy_fine = ngs.sqrt(ngs.Integrate(energy_fine**2, self.mesh))
+                print("Energy on fine: ", ngs.Integrate(energy_fine, self.mesh))
+                err = ngs.sqrt(ngs.Integrate((energy_coarse-energy_fine)**2, self.mesh))
+                print("Error:", err/tot_energy_fine)
+                self.dt.Set(self.dt.Get()*2)
+                self.gf_old.vec.data = store_gf_old
+                if err > self.timestepping_tolerance * tot_energy_fine:
+                    raise ErrorTooLarge()
             self.time += self.dt.Get()
             # if self._user_timestep is not None and self.dt.Get() < self._user_timestep:
             #     self.dt.Set(min(self.dt.Get()*2, self._user_timestep))
             #     print("Increase timestep to:", self.dt.Get())
-        except NewtonNotConverged as e:
+        except NonlinearException as e:
             if self.dt.Get() > self.min_timestep:
                 self.dt.Set(self.dt.Get()/2)
                 self.gf.vec.data = self.gf_old.vec
-                print("Newton not converged, try smaller timestep:", self.dt.Get())
+                print(str(e) + ", try smaller timestep:", self.dt.Get())
                 self.do_timestep()
             else:
                 raise e
