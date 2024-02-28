@@ -16,10 +16,11 @@ R = 8.314 # J/mol/K
 
 class Phase:
     def __init__(self, name: str, diffusion_coefficient: float,
-                 surface_energies=None):
+                 surface_energies=None, site_variable=1.):
         self.names = name
         self.D = diffusion_coefficient
         self.surface_energies = surface_energies
+        self.site_variable = site_variable
 
     def get_surface_energy(self, other_phase, interface_normal) -> float | ngs.CF:
         assert self.surface_energies is not None, "Surface energies not defined!"
@@ -49,7 +50,7 @@ class Phase:
             solvent_energy = components[-1].phase_energies[self]
             my_energy = component.phase_energies[self]
             eps = my_energy - solvent_energy
-            alpha = ngs.exp((potentials[i] - eps)/(R*T))
+            alpha = ngs.exp((potentials[i] - eps)/(self.site_variable*R*T))
             concentrations[component] = alpha/(1+alpha)
         return concentrations
 
@@ -62,7 +63,7 @@ class Phase:
             solvent_energy = solvent.phase_energies[self]
             my_energy = comp.phase_energies[self]
             eps = my_energy - solvent_energy
-            potentials[comp] = eps + R * T * ngs.IfPos(conc, ngs.IfPos(1-conc, ngs.log(conc/(1-conc)), 0), 0)
+            potentials[comp] = eps + self.site_variable * R * T * ngs.IfPos(conc, ngs.IfPos(1-conc, ngs.log(conc/(1-conc)), 0), 0)
         return potentials
 
     def get_chemical_potential(self, components, potentials, T):
