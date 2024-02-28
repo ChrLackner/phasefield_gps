@@ -1,7 +1,7 @@
 
 import ngsolve as ngs
 from .phase import Phase
-from .component import Component
+from .component import Component, IdealSolutionComponent
 
 class CGWrapper:
     def __init__(self, a, *args, **kwargs):
@@ -297,6 +297,20 @@ Initial conditions for phase. For components, for each phase an initial conditio
             self.gfw.vec.data = tmp
             if self.mass_conservation:
                 self.gfcs.vec.data = tmp2
+
+    def plot_energy_landscape(self):
+        assert len(self.components) == 2
+        import matplotlib.pyplot as plt
+        import numpy as np
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        c1, c2 = self.components
+        assert type(c1) == IdealSolutionComponent and type(c2) == IdealSolutionComponent
+        for phase in self.phases:
+            c_vals = np.linspace(0, 1, 100)
+            e_vals = [c * c1.phase_energies[phase] + (1-c) * c2.phase_energies[phase] + 8.314 * self.T * (c*ngs.log(c) + (1-c) * ngs.log(1-c))for c in c_vals]
+            ax.plot(c_vals, e_vals, label=phase.name)
+        return fig
 
     @ngs.TimeFunction
     def do_timestep(self):

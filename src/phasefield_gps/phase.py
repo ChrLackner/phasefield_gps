@@ -17,7 +17,7 @@ R = 8.314 # J/mol/K
 class Phase:
     def __init__(self, name: str, diffusion_coefficient: float,
                  surface_energies=None, site_variable=1.):
-        self.names = name
+        self.name = name
         self.D = diffusion_coefficient
         self.surface_energies = surface_energies
         self.site_variable = site_variable
@@ -74,6 +74,7 @@ class Phase:
             omega += component.phase_energies[self] * concentration
             sum_concentrations += concentration
         omega += components[-1].phase_energies[self] * (1-sum_concentrations)
+        omega += R * T * (sum([c * ngs.IfPos(c, ngs.log(c), 0) for c in concentrations.values()]) + (1-sum_concentrations) * ngs.IfPos(1-sum_concentrations, ngs.log(1-sum_concentrations), 0))
         return omega
 
     def get_chi(self, components, potentials, T):
