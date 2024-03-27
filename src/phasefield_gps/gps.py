@@ -2,6 +2,7 @@
 import ngsolve as ngs
 from .phase import Phase
 from .component import Component, IdealSolutionComponent
+from .utils import convex_hull
 
 class CGWrapper:
     def __init__(self, a, *args, **kwargs):
@@ -71,7 +72,7 @@ l : float
         self.gamma[:] = 1.5
         for i in range(len(self.phase_indices)):
             self.gamma[i,i] = 0
-        self.T = temperature
+        self.T = ngs.Parameter(temperature)
         self.l = interface_width
         self.Vm = molar_volume
         self.mu = interface_mobility
@@ -122,6 +123,29 @@ l : float
 
     def m(self, etas=None) -> ngs.CF | float:
         return 6 * self.sigma(etas)/self.l
+
+    def set_Temperature(self, T):
+        if hasattr(self, "gfetas"):
+            print("Set temperature to", T)
+            potentials = self.gfw
+            fes_tmp = ngs.H1(self.mesh, order=3)
+            components = {
+                comp : {
+                    phase : ngs.GridFunction(fes_tmp)
+                    for phase in self.phases }
+                for comp in self.components }
+            for phase in self.phases:
+                concentrations = phase.get_concentrations(self.components,
+                                                          potentials, self.T)
+                for comp in self.components[:-1]:
+                    components[comp][phase].Interpolate(concentrations[comp])
+                components[self.components[-1]][phase].Interpolate(ngs.CF(1)-sum(concentrations[comp] for comp in self.components[:-1]))
+            # this also calls compute phase energies
+        self.T.Set(T)
+        if hasattr(self, "gfetas"):
+            self.set_initial_conditions(phases=None,
+                                        components=components)
+            self._build_forms()
 
     def get_multiwell_energy(self, etas : list[ngs.CoefficientFunction] | None = None) \
             -> ngs.CoefficientFunction:
@@ -198,15 +222,6 @@ l : float
             fes_comp = fes_comp**(n_c-1)
         fes_phase = h1**n_p
         self.fes = fes_comp * fes_phase
-        trial = self.fes.TrialFunction()
-        test = self.fes.TestFunction()
-        w, etas = trial[:-1], trial[-1]
-        dw, detas = test[:-1], test[-1]
-        if self.mass_conservation:
-            c = [w[i*2+1] for i in range(n_c-1)]
-            w = [w[i*2] for i in range(n_c-1)]
-            dc = [dw[i*2+1] for i in range(n_c-1)]
-            dw = [dw[i*2] for i in range(n_c-1)]
 
         self.gf = ngs.GridFunction(self.fes)
         self.gfw = self.gf.components[:-1]
@@ -218,14 +233,26 @@ l : float
             self.gfw = self.gfw[0]
         self.gf_old = ngs.GridFunction(self.fes)
         self._gf_coarse = ngs.GridFunction(self.fes)
-        gfw_old = self.gf_old.components[:-1]
+        self.gfw_old = self.gf_old.components[:-1]
         self._gfw_coarse = self._gf_coarse.components[:-1]
         self.gfetas_old = self.gf_old.components[-1]
         self._gfetas_coarse = self._gf_coarse.components[-1]
         if self.mass_conservation:
-            gfcs_old = gfw_old[1]
-            gfw_old = gfw_old[0]
+            self.gfcs_old = self.gfw_old[1]
+            self.gfw_old = self.gfw_old[0]
 
+    def _build_forms(self):
+        n_p = len(self.phases)
+        n_c = len(self.components)
+        trial = self.fes.TrialFunction()
+        test = self.fes.TestFunction()
+        w, etas = trial[:-1], trial[-1]
+        dw, detas = test[:-1], test[-1]
+        if self.mass_conservation:
+            c = [w[i*2+1] for i in range(n_c-1)]
+            w = [w[i*2] for i in range(n_c-1)]
+            dc = [dw[i*2+1] for i in range(n_c-1)]
+            dw = [dw[i*2] for i in range(n_c-1)]
         omega = self.get_energy(etas, w)
 
         self.a = ngs.BilinearForm(self.fes)
@@ -236,7 +263,7 @@ l : float
         list_etas = [etai for etai in etas]
         concentrations = self._get_concentrations(list_etas, w)
         if self.mass_conservation:
-            for ci, dci, gfci_old in zip(c, dc, [gfcs_old]):
+            for ci, dci, gfci_old in zip(c, dc, [self.gfcs_old]):
                 forms += 1/self.dt * (ci-gfci_old) * dci * ngs.dx
             Dchi = self.get_D_times_chi(etas, w)
             for wi, dci in zip(w, dc):
@@ -246,7 +273,7 @@ l : float
         else:
             chi = self.get_chi(etas, w)
             Dchi = self.get_D_times_chi(etas, w)
-            forms += self.Vm * chi * 1/self.dt * (w[0]-gfw_old[0]) * dw * ngs.dx
+            forms += self.Vm * chi * 1/self.dt * (w[0]-self.gfw_old[0]) * dw * ngs.dx
             forms += self.Vm * Dchi * ngs.InnerProduct(ngs.grad(w[0]),ngs.grad(dw[0])) * ngs.dx
             rho = 1/self.Vm * concentrations[self.components[0]]
             for etai in list_etas:
@@ -276,6 +303,7 @@ Initial conditions for phase. For components, for each phase an initial conditio
             for phase, ic in phases.items():
                 self.gfetas.components[self.phase_indices[phase]].Set(ic, dual=True)
         if components is not None:
+            self.compute_phase_energies(components)
             tmp = self.gfw.vec.CreateVector()
             tmp[:] = 0
             if self.mass_conservation:
@@ -298,6 +326,49 @@ Initial conditions for phase. For components, for each phase an initial conditio
             if self.mass_conservation:
                 self.gfcs.vec.data = tmp2
 
+    def compute_phase_energies(self, component_concentrations):
+        print(component_concentrations)
+        assert len(self.components) == 2
+        assert type(self.components[0]) == IdealSolutionComponent and \
+            type(self.components[1]) == IdealSolutionComponent
+        vol_domain = ngs.Integrate(ngs.CF(1), self.mesh)
+        X = sum([ngs.Integrate(
+            component_concentrations[self.components[0]][phase] * \
+            self.get_phase(phase),
+            self.mesh)/vol_domain for phase in self.phases])
+        energies = [c.get_base_phase_energies_at_temperature(self.T.Get()) for c in self.components]
+        phase_energy = lambda c, phase: (c * energies[0][phase] + (1-c) * energies[1][phase] + phase.site_variable * 8.314 * self.T.Get() * (c*ngs.log(c) + (1-c) * ngs.log(1-c)))
+        import numpy as np
+        from scipy.spatial import ConvexHull
+        pts = np.arange(0,1,0.0005)[1:-1]
+        gs = np.array([phase_energy(p, self.phases[0]) for p in pts])
+        gl = np.array([phase_energy(p, self.phases[1]) for p in pts])
+        print(gs)
+        # Minimization and common tangent
+        g = np.min(np.vstack([gs, gl]), axis=0)
+        hull = ConvexHull(np.array([pts, g]).T)
+        k = hull.vertices
+        k = np.sort(k)  # Ensure k is sorted if not already
+        find = np.where(np.diff(k) > 1)[0]
+        ind1 = find[0] if len(find) else 0
+        ind2 = k[ind1 + 1]
+        ind1 = k[ind1]
+        print("X = ", X)
+        if X < pts[ind1]:
+            ind1 = np.where(pts > X)[0][0]-1
+            ind2 = ind1+1
+            print("ind1 = ", ind1, "pos = ", pts[ind1])
+            print("ind2 = ", ind2, "pos = ", pts[ind2])
+        elif X > pts[ind2]:
+            ind1 = np.where(pts < X)[0][-1]
+            ind2 = ind1+1
+            print("ind1 = ", ind1, "pos = ", pts[ind1])
+            print("ind2 = ", ind2, "pos = ", pts[ind2])
+        derivative = np.abs((g[ind2] - g[ind1]) / (pts[ind2] - pts[ind1]))
+
+        self.components[0].phase_energies = energies[0]
+        self.components[1].phase_energies = { phase : energies[1][phase] - derivative  for phase in self.phases}
+
     def plot_energy_landscape(self):
         assert len(self.components) == 2
         import matplotlib.pyplot as plt
@@ -307,15 +378,16 @@ Initial conditions for phase. For components, for each phase an initial conditio
         c1, c2 = self.components
         assert type(c1) == IdealSolutionComponent and type(c2) == IdealSolutionComponent
         for phase in self.phases:
-            c_vals = np.linspace(0, 1, 100)
-            e_vals = [c * c1.phase_energies[phase] + (1-c) * c2.phase_energies[phase] + 8.314 * self.T * (c*ngs.log(c) + (1-c) * ngs.log(1-c))for c in c_vals]
+            c_vals = np.linspace(0, 1, 100)[1:-1]
+            e_vals = [c * c1.phase_energies[phase] + (1-c) * c2.phase_energies[phase] + phase.site_variable * 8.314 * self.T.Get() * (c*ngs.log(c) + (1-c) * ngs.log(1-c))for c in c_vals]
             ax.plot(c_vals, e_vals, label=phase.name)
+        fig.legend()
         return fig
 
     @ngs.TimeFunction
     def do_timestep(self):
         if not hasattr(self, "a"):
-            self._setup()
+            self._build_forms()
         self.gf_old.vec.data = self.gf.vec
         def callback(it, err):
             import math
