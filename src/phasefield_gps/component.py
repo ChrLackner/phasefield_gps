@@ -11,7 +11,7 @@ class Component:
         pass
 
 class IdealSolutionComponent(Component):
-    def __init__(self, phase_energies: dict[Phase, float | dict[float,float]],
+    def __init__(self, phase_energies: dict[Phase, float | dict[float,float] | str],
                  **kwargs):
         """
 Phase energies is a dictionary with keys as Phase objects and values as the
@@ -20,7 +20,29 @@ with keys as the temperature and values as the energy of the phase at that
 temperature.
         """
         super().__init__(**kwargs)
-        self.base_phase_energies = phase_energies
+        if isinstance(list(phase_energies.values())[0], str):
+            self.base_phase_energies = self._read_from_file(phase_energies)
+        else:
+            self.base_phase_energies = phase_energies
+
+    def _read_from_file(self, phase_filename: dict[Phase, str]) \
+            -> dict[Phase, float | dict[float,float]]:
+        energies = {}
+        for phase, filename in phase_filename.items():
+            with open(filename, 'r', encoding='ASCII') as f:
+                found_start = False
+                energies[phase] = {}
+                for line in f:
+                    values = line.strip().split()
+                    if not found_start:
+                        if len(values) > 2 and values[0].strip() == 'T(K)' and \
+                                values[1].strip() == 'P(bar)':
+                            found_start = True
+                        continue
+                    T = float(values[0].strip())
+                    energy = float(values[2].strip())
+                    energies[phase][T] = energy
+        return energies
 
     def get_base_phase_energies_at_temperature(self, temperature: float) \
             -> dict[Phase,float]:

@@ -6,36 +6,41 @@ liquid = Phase("liquid", diffusion_coefficient=3e-7,
                site_variable=1.7892)    #3e-7
 solid = Phase("solid", diffusion_coefficient=3e-12,     #3e-12
               surface_energies={ liquid : 2.451e4 },
-              site_variable=2) # J/m**2
+              site_variable=2.) # J/m**2
 
-fosterite_liquid = { 1373.15: -2280010.,
-                     1773.15: -2434149.,
-                     2173.15: -2612808.,
-                     3273.15: -3198056. }
+# fosterite_liquid = { 1373.15: -2280010.,
+#                      1773.15: -2434149.,
+#                      2173.15: -2612808.,
+#                      3273.15: -3198056. }
 
-fosterite_solid = {1373.15: -2307279.,
-                   1773.15: -2450896.,
-                   2173.15: -2611896.,
-                   3273.15: -3123702. }
+# fosterite_solid = {1373.15: -2307279.,
+#                    1773.15: -2450896.,
+#                    2173.15: -2611896.,
+#                    3273.15: -3123702. }
 
+fosterite_liquid = "foL_1373-2273-10.tab"
+fosterite_solid = "fo_1373-2273-10.tab"
 
 fosterite = IdealSolutionComponent(name="Fosterite",
                                    phase_energies={ liquid: fosterite_liquid,
                                                     solid: fosterite_solid })
 
-fayalite_liquid = {1373.15: -1699537.,
-                   1773.15: -1899806.,
-                   2173.15: -2122255.,
-                   3273.15: -2818967. }
+# fayalite_liquid = {1373.15: -1699537.,
+#                    1773.15: -1899806.,
+#                    2173.15: -2122255.,
+#                    3273.15: -2818967. }
 
-fayalite_solid = { 1373.15: -1706086.,
-                   1773.15: -1881116.,
-                   2173.15: -2075201.,
-                   3273.15: -2686725. }
+# fayalite_solid = { 1373.15: -1706086.,
+#                    1773.15: -1881116.,
+#                    2173.15: -2075201.,
+#                    3273.15: -2686725. }
+
+fayalite_liquid = "faL_1373-2273-10.tab"
+fayalite_solid = "fa_1373-2273-10.tab"
 
 fayalite = IdealSolutionComponent(name="Fayalite",
                                     phase_energies={ liquid: fayalite_liquid,
-                                                         solid: -1881116 })
+                                                         solid: fayalite_solid })
 nx = 100
 ny = 10
 mesh = MakeStructured2DMesh(quads=True, nx=nx, ny=ny,
@@ -131,7 +136,7 @@ def callback():
             plt.savefig(f"{name}.png")
 
     # the first time the solve passes 0.01 sec we change the temperature
-    if model.time > 0.01 and model.T.Get() < 2000:
+    if model.time > 0.01 and model.T.Get() < 1800:
         model.set_Temperature(1900)
         fig = model.plot_energy_landscape()
         fig.savefig(f"energy_landscape_{model.T.Get()}.png")
