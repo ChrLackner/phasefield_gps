@@ -124,23 +124,30 @@ l : float
     def m(self, etas=None) -> ngs.CF | float:
         return 6 * self.sigma(etas)/self.l
 
-    def set_Temperature(self, T):
+    def set_Temperature(self, T, new_concentrations : None | dict[Phase, ngs.CF]=None):
         if hasattr(self, "gfetas"):
             print("Set temperature to", T)
-            potentials = self.gfw
-            fes_tmp = ngs.H1(self.mesh, order=3)
-            components = {
-                comp : {
-                    phase : ngs.GridFunction(fes_tmp)
-                    for phase in self.phases }
-                for comp in self.components }
-            for phase in self.phases:
-                concentrations = phase.get_concentrations(self.components,
-                                                          potentials, self.T)
-                for comp in self.components[:-1]:
-                    components[comp][phase].Interpolate(concentrations[comp])
-                components[self.components[-1]][phase].Interpolate(ngs.CF(1)-sum(concentrations[comp] for comp in self.components[:-1]))
-            # this also calls compute phase energies
+            if new_concentrations is not None:
+                components = new_concentrations
+            else:
+                potentials = self.gfw
+                fes_tmp = ngs.H1(self.mesh, order=3)
+                components = {
+                    comp : {
+                        phase : ngs.GridFunction(fes_tmp)
+                        for phase in self.phases }
+                    for comp in self.components }
+                for phase in self.phases:
+                    concentrations = phase.get_concentrations(self.components,
+                                                              potentials, self.T)
+                    for comp in self.components[:-1]:
+                        components[comp][phase].Interpolate(concentrations[comp])
+
+                        components[self.components[-1]][phase].\
+                            Interpolate(ngs.CF(1)-\
+                                        sum(concentrations[comp] \
+                                            for comp in self.components[:-1]))
+        # this also calls compute phase energies
         self.T.Set(T)
         if hasattr(self, "gfetas"):
             self.set_initial_conditions(phases=None,
