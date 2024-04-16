@@ -66,7 +66,7 @@ class Phase:
             potentials[comp] = eps + self.site_variable * R * T * ngs.IfPos(conc, ngs.IfPos(1-conc, ngs.log(conc/(1-conc)), 0), 0)
         return potentials
 
-    def get_chemical_potential(self, components, potentials, T):
+    def get_chemical_energy(self, components, potentials, T):
         concentrations = self.get_concentrations(components, potentials, T)
         omega = 0
         sum_concentrations = 0

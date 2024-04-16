@@ -178,7 +178,7 @@ l : float
         omega_chem = ngs.CF(0)
         hs = self.h(etas)
         for phase, h in zip(self.phases, hs):
-            omega = phase.get_chemical_potential(self.components, potentials, self.T)
+            omega = phase.get_chemical_energy(self.components, potentials, self.T)
             omega_chem += h * omega
         return 1/self.Vm * omega_chem
 
