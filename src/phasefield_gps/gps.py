@@ -353,27 +353,22 @@ Initial conditions for phase. For components, for each phase an initial conditio
         hull = ConvexHull(np.array([pts, g]).T)
         k = hull.vertices
         k = np.sort(k)  # Ensure k is sorted if not already
-        find = np.where(np.diff(k) > 1)
-        ind1 = find[0][0] if len(find) else 0
-        ind2 = k[ind1 + 1]
-        ind1 = k[ind1]
+        find = np.where(np.diff(k) > 1)[0]
         print("X = ", X)
-        found_in_between = False
         check_in_between = 0
         for found in find:
-            ind1 = k[found[0]]
-            ind2 = k[found[0]+1]
+            ind1 = k[found]
+            ind2 = k[found+1]
             if X > pts[ind1] and X < pts[ind2]:
-                found_in_between = True
                 break
             check_in_between += 1
-        if not found_in_between:
+        if check_in_between == len(find): # not found
             ind1 = np.where(pts < X)[0][-1]
             ind2 = ind1+1
         derivative = ((g[ind2] - g[ind1]) / (pts[ind2] - pts[ind1]))
         print("derivative = ", derivative)
         self.components[0].phase_energies = { phase : energies[0][phase] - derivative for phase in self.phases }
-        self.components[1].phase_energies = self.components[1].get_base_phase_energies_at_temperature(self.T.Get())
+        self.components[1].phase_energies = { phase : energies[1][phase] for phase in self.phases }
         print("new energies = ", self.components[0].phase_energies)
 
     def plot_energy_landscape(self):
