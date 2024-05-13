@@ -2,7 +2,6 @@
 import ngsolve as ngs
 from .phase import Phase
 from .component import Component, IdealSolutionComponent
-from .utils import convex_hull
 
 class CGWrapper:
     def __init__(self, a, *args, **kwargs):
