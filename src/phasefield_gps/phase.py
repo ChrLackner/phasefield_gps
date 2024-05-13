@@ -44,6 +44,7 @@ class Phase:
     def get_concentrations(self, components, potentials, T):
         assert len(components) < 3, "TODO: implement for more than two components"
         concentrations = {}
+        sum_concentrations = 0
         for i,component in enumerate(components[:-1]):
             assert isinstance(component, type(components[-1])), \
                 "All components must be of same type!"
@@ -52,6 +53,8 @@ class Phase:
             eps = my_energy - solvent_energy
             alpha = ngs.exp((potentials[i] - eps)/(self.site_variable*R*T))
             concentrations[component] = alpha/(1+alpha)
+            sum_concentrations += concentrations[component]
+            concentrations[components[-1]] = (1-sum_concentrations)
         return concentrations
 
     def get_potentials(self, concentrations, solvent, T):
@@ -66,15 +69,18 @@ class Phase:
             potentials[comp] = eps + self.site_variable * R * T * ngs.IfPos(conc, ngs.IfPos(1-conc, ngs.log(conc/(1-conc)), 0), 0)
         return potentials
 
-    def get_chemical_energy(self, components, potentials, T):
+    def get_chemical_energy_from_potential(self, components, potentials, T):
         concentrations = self.get_concentrations(components, potentials, T)
+        return self.get_chemical_energy(concentrations, T)
+
+    def get_chemical_energy(self, concentrations, T, use_ifpos=True):
         omega = 0
-        sum_concentrations = 0
         for component, concentration in concentrations.items():
             omega += component.phase_energies[self] * concentration
-            sum_concentrations += concentration
-        omega += components[-1].phase_energies[self] * (1-sum_concentrations)
-        omega += R * T * (sum([c * ngs.IfPos(c, ngs.log(c), 0) for c in concentrations.values()]) + (1-sum_concentrations) * ngs.IfPos(1-sum_concentrations, ngs.log(1-sum_concentrations), 0))
+        if use_ifpos:
+            omega += self.site_variable * R * T * sum([c * ngs.IfPos(c, ngs.log(c), 0) for c in concentrations.values()])
+        else:
+            omega += self.site_variable * R * T * sum([c * ngs.log(c) for c in concentrations.values()])
         return omega
 
     def get_chi(self, components, potentials, T):

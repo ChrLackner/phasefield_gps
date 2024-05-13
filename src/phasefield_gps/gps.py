@@ -178,7 +178,7 @@ l : float
         omega_chem = ngs.CF(0)
         hs = self.h(etas)
         for phase, h in zip(self.phases, hs):
-            omega = phase.get_chemical_energy(self.components, potentials, self.T)
+            omega = phase.get_chemical_energy_from_potential(self.components, potentials, self.T)
             omega_chem += h * omega
         return 1/self.Vm * omega_chem
 
@@ -213,8 +213,8 @@ l : float
             concentrations = phase.get_concentrations(self.components,
                                                       potentials, self.T)
 
-            for comp, concentration in concentrations.items():
-                c[comp] += h * concentration
+            for comp in self.components[:-1]:
+                c[comp] += h * concentrations[comp]
         return c
 
     def _setup(self):
@@ -334,7 +334,6 @@ Initial conditions for phase. For components, for each phase an initial conditio
                 self.gfcs.vec.data = tmp2
 
     def compute_phase_energies(self, component_concentrations):
-        print(component_concentrations)
         assert len(self.components) == 2
         assert type(self.components[0]) == IdealSolutionComponent and \
             type(self.components[1]) == IdealSolutionComponent
@@ -347,34 +346,36 @@ Initial conditions for phase. For components, for each phase an initial conditio
         phase_energy = lambda c, phase: (c * energies[0][phase] + (1-c) * energies[1][phase] + phase.site_variable * 8.314 * self.T.Get() * (c*ngs.log(c) + (1-c) * ngs.log(1-c)))
         import numpy as np
         from scipy.spatial import ConvexHull
-        pts = np.arange(0,1,0.0005)[1:-1]
+        pts = np.arange(0,1,0.0001)[1:-1]
         gs = np.array([phase_energy(p, self.phases[0]) for p in pts])
         gl = np.array([phase_energy(p, self.phases[1]) for p in pts])
-        print(gs)
         # Minimization and common tangent
         g = np.min(np.vstack([gs, gl]), axis=0)
         hull = ConvexHull(np.array([pts, g]).T)
         k = hull.vertices
         k = np.sort(k)  # Ensure k is sorted if not already
-        find = np.where(np.diff(k) > 1)[0]
-        ind1 = find[0] if len(find) else 0
+        find = np.where(np.diff(k) > 1)
+        ind1 = find[0][0] if len(find) else 0
         ind2 = k[ind1 + 1]
         ind1 = k[ind1]
         print("X = ", X)
-        if X < pts[ind1]:
-            ind1 = np.where(pts > X)[0][0]-1
-            ind2 = ind1+1
-            print("ind1 = ", ind1, "pos = ", pts[ind1])
-            print("ind2 = ", ind2, "pos = ", pts[ind2])
-        elif X > pts[ind2]:
+        found_in_between = False
+        check_in_between = 0
+        for found in find:
+            ind1 = k[found[0]]
+            ind2 = k[found[0]+1]
+            if X > pts[ind1] and X < pts[ind2]:
+                found_in_between = True
+                break
+            check_in_between += 1
+        if not found_in_between:
             ind1 = np.where(pts < X)[0][-1]
             ind2 = ind1+1
-            print("ind1 = ", ind1, "pos = ", pts[ind1])
-            print("ind2 = ", ind2, "pos = ", pts[ind2])
-        derivative = np.abs((g[ind2] - g[ind1]) / (pts[ind2] - pts[ind1]))
-
-        self.components[0].phase_energies = energies[0]
-        self.components[1].phase_energies = { phase : energies[1][phase] - derivative  for phase in self.phases}
+        derivative = ((g[ind2] - g[ind1]) / (pts[ind2] - pts[ind1]))
+        print("derivative = ", derivative)
+        self.components[0].phase_energies = { phase : energies[0][phase] - derivative for phase in self.phases }
+        self.components[1].phase_energies = self.components[1].get_base_phase_energies_at_temperature(self.T.Get())
+        print("new energies = ", self.components[0].phase_energies)
 
     def plot_energy_landscape(self):
         assert len(self.components) == 2
@@ -386,8 +387,10 @@ Initial conditions for phase. For components, for each phase an initial conditio
         assert type(c1) == IdealSolutionComponent and type(c2) == IdealSolutionComponent
         for phase in self.phases:
             c_vals = np.linspace(0, 1, 100)[1:-1]
-            e_vals = [c * c1.phase_energies[phase] + (1-c) * c2.phase_energies[phase] + phase.site_variable * 8.314 * self.T.Get() * (c*ngs.log(c) + (1-c) * ngs.log(1-c))for c in c_vals]
-            ax.plot(c_vals, e_vals, label=phase.name)
+            # e_vals = [c * c1.phase_energies[phase] + (1-c) * c2.phase_energies[phase] + phase.site_variable * 8.314 * self.T.Get() * (c*ngs.log(c) + (1-c) * ngs.log(1-c))for c in c_vals]
+            e_vals = [phase.get_chemical_energy({ self.components[0] : c, self.components[1]: 1-c }, self.T.Get(), use_ifpos=False) for c in c_vals]
+            ind = e_vals.index(min(e_vals))
+            ax.plot(c_vals, e_vals, label=phase.name + " " + str(c_vals[ind]))
         fig.legend()
         return fig
 
