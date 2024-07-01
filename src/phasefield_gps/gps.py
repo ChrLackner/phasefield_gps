@@ -264,6 +264,22 @@ l : float
         self.a = ngs.BilinearForm(self.fes)
         forms = 1/self.dt * (etas-self.gfetas_old) * detas * ngs.dx
         forms += self.L * (omega * ngs.dx).Diff(etas, detas)
+        if self.mass_conservation:
+            print("len c = ", n_c)
+            assert n_c == 2, "more components still need to be implememented " + str(n_c)
+            mu0 = self.phases[0].get_potentials(
+                concentrations={ self.components[0] : c[0],
+                                 self.components[1] : None },
+                solvent=self.components[1], T=self.T)[self.components[0]]
+            mu1 = self.phases[1].get_potentials(
+                concentrations={ self.components[0] : c[0],
+                                 self.components[1] : None },
+                solvent=self.components[1], T=self.T)[self.components[0]]
+            dmudphi = ngs.CF((mu0-mu1,mu1-mu0))
+            chi = self.get_chi(etas, w)
+            forms += 8.314 * self.T * self.L * w[0] * chi * dmudphi * detas * ngs.dx
+        else:
+            raise Exception("Not yet implemented!")
 
         # TODO: Implement for multiple components
         list_etas = [etai for etai in etas]
@@ -273,14 +289,17 @@ l : float
                 forms += 1/self.dt * (ci-gfci_old) * dci * ngs.dx
             Dchi = self.get_D_times_chi(etas, w)
             for wi, dci in zip(w, dc):
-                forms += self.Vm * Dchi * ngs.InnerProduct(ngs.grad(wi),ngs.grad(dci)) * ngs.dx
+                # forms += self.Vm * Dchi * ngs.InnerProduct(ngs.grad(wi),ngs.grad(dci)) * ngs.dx
+                forms += Dchi * ngs.InnerProduct(ngs.grad(wi),ngs.grad(dci)) * ngs.dx
             for ci, dwi in zip(c, dw):
                 forms += (concentrations[self.components[0]] - ci) * dwi * ngs.dx
         else:
             chi = self.get_chi(etas, w)
             Dchi = self.get_D_times_chi(etas, w)
-            forms += self.Vm * chi * 1/self.dt * (w[0]-self.gfw_old[0]) * dw * ngs.dx
-            forms += self.Vm * Dchi * ngs.InnerProduct(ngs.grad(w[0]),ngs.grad(dw[0])) * ngs.dx
+            # forms += self.Vm * chi * 1/self.dt * (w[0]-self.gfw_old[0]) * dw * ngs.dx
+            # forms += self.Vm * Dchi * ngs.InnerProduct(ngs.grad(w[0]),ngs.grad(dw[0])) * ngs.dx
+            forms += chi * 1/self.dt * (w[0]-self.gfw_old[0]) * dw * ngs.dx
+            forms += Dchi * ngs.InnerProduct(ngs.grad(w[0]),ngs.grad(dw[0])) * ngs.dx
             rho = 1/self.Vm * concentrations[self.components[0]]
             for etai in list_etas:
                 etai.MakeVariable()
@@ -331,6 +350,7 @@ Initial conditions for phase. For components, for each phase an initial conditio
             self.gfw.vec.data = tmp
             if self.mass_conservation:
                 self.gfcs.vec.data = tmp2
+        self.gf_old.vec.data = self.gf.vec
 
     def compute_phase_energies(self, component_concentrations):
         assert len(self.components) == 2
@@ -354,7 +374,7 @@ Initial conditions for phase. For components, for each phase an initial conditio
         k = hull.vertices
         k = np.sort(k)  # Ensure k is sorted if not already
         find = np.where(np.diff(k) > 1)[0]
-        print("X = ", X)
+        # print("X = ", X)
         check_in_between = 0
         for found in find:
             ind1 = k[found]
@@ -366,10 +386,10 @@ Initial conditions for phase. For components, for each phase an initial conditio
             ind1 = np.where(pts < X)[0][-1]
             ind2 = ind1+1
         derivative = ((g[ind2] - g[ind1]) / (pts[ind2] - pts[ind1]))
-        print("derivative = ", derivative)
+        # print("derivative = ", derivative)
         self.components[0].phase_energies = { phase : energies[0][phase] - derivative for phase in self.phases }
         self.components[1].phase_energies = { phase : energies[1][phase] for phase in self.phases }
-        print("new energies = ", self.components[0].phase_energies)
+        # print("new energies = ", self.components[0].phase_energies)
 
     def plot_energy_landscape(self):
         assert len(self.components) == 2
@@ -385,6 +405,13 @@ Initial conditions for phase. For components, for each phase an initial conditio
             e_vals = [phase.get_chemical_energy({ self.components[0] : c, self.components[1]: 1-c }, self.T.Get(), use_ifpos=False) for c in c_vals]
             ind = e_vals.index(min(e_vals))
             ax.plot(c_vals, e_vals, label=phase.name + " " + str(c_vals[ind]))
+        # hard coded for now
+        xvals = np.linspace(-0.5e-3, 0.5e-3, 11)
+        pts = self.mesh(xvals, 0.)
+        cvals = self.get_concentrations()[self.components[0]](pts)
+        energies = self.Vm * self.get_chemical_energy()(pts)
+        ax.plot(cvals, energies, "o", label="Concentrations")
+
         fig.legend()
         return fig
 
@@ -392,7 +419,7 @@ Initial conditions for phase. For components, for each phase an initial conditio
     def do_timestep(self):
         if not hasattr(self, "a"):
             self._build_forms()
-        self.gf_old.vec.data = self.gf.vec
+        # self.gf_old.vec.data = self.gf.vec
         def callback(it, err):
             import math
             if math.isnan(err):

@@ -54,7 +54,7 @@ class Phase:
             alpha = ngs.exp((potentials[i] - eps)/(self.site_variable*R*T))
             concentrations[component] = alpha/(1+alpha)
             sum_concentrations += concentrations[component]
-            concentrations[components[-1]] = (1-sum_concentrations)
+        concentrations[components[-1]] = (1-sum_concentrations)
         return concentrations
 
     def get_potentials(self, concentrations, solvent, T):
@@ -88,4 +88,4 @@ class Phase:
         assert len(components) == 2, "TODO: implement for more than two components"
         c = concentrations[components[0]]
         c = ngs.IfPos(c-1e-9, c, 1e-9)
-        return c * (1-c)
+        return 1/(self.site_variable * R * T) * c * (1-c)
