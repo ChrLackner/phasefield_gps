@@ -450,6 +450,7 @@ Initial conditions for phase. For components, for each phase an initial conditio
                 if err > self.timestepping_tolerance * tot_energy_fine:
                     raise ErrorTooLarge()
             self.time += self.dt.Get()
+            self.gf_old.vec.data = self.gf.vec
             # if self._user_timestep is not None and self.dt.Get() < self._user_timestep:
             #     self.dt.Set(min(self.dt.Get()*2, self._user_timestep))
             #     print("Increase timestep to:", self.dt.Get())
