@@ -1,3 +1,4 @@
+from typing import Callable
 import ngsolve as ngs
 
 def argmax2(x,f):
@@ -15,7 +16,7 @@ def argmax(x,f):
 R = 8.314 # J/mol/K
 
 class Phase:
-    def __init__(self, name: str, diffusion_coefficient: float,
+    def __init__(self, name: str, diffusion_coefficient: float | Callable,
                  surface_energies=None, site_variable=1.):
         self.name = name
         self.D = diffusion_coefficient
@@ -89,3 +90,25 @@ class Phase:
         c = concentrations[components[0]]
         c = ngs.IfPos(c-1e-9, c, 1e-9)
         return 1/(self.site_variable * R * T) * c * (1-c)
+
+    def get_D(self, components, potentials, T):
+        concentrations = self.get_concentrations(components, potentials, T)
+        assert len(components) == 2, "TODO: implement for more than two components"
+        c = concentrations[components[0]]
+        c = ngs.IfPos(c-1e-9, c, 1e-9)
+        if callable(self.D):
+            D = self.D(c)
+        else:
+            D = self.D
+        return D
+
+    def get_D_times_chi(self, components, potentials, T):
+        concentrations = self.get_concentrations(components, potentials, T)
+        assert len(components) == 2, "TODO: implement for more than two components"
+        c = concentrations[components[0]]
+        c = ngs.IfPos(c-1e-9, c, 1e-9)
+        if callable(self.D):
+            D = self.D(c)
+        else:
+            D = self.D
+        return D * 1/(self.site_variable * R * T) * c * (1-c)

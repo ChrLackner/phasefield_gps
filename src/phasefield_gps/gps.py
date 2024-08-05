@@ -36,7 +36,7 @@ class GrandPotentialSolver:
     def __init__(self, mesh: ngs.Mesh, components: list[Component],
                  phases: list[Phase], molar_volume: float,
                  interface_mobility: float,
-                 temperature: float,
+                 temperature: float | ngs.Parameter,
                  interface_width: float):
         """
 See https://link.aps.org/doi/10.1103/PhysRevE.98.023309 for details.
@@ -71,7 +71,7 @@ l : float
         self.gamma[:] = 1.5
         for i in range(len(self.phase_indices)):
             self.gamma[i,i] = 0
-        self.T = ngs.Parameter(temperature)
+        self.T = temperature if isinstance(temperature, ngs.Parameter) else ngs.Parameter(temperature)
         self.l = interface_width
         self.Vm = molar_volume
         self.mu = interface_mobility
@@ -201,7 +201,7 @@ l : float
         hs = self.h(etas)
         Dchi = ngs.CF(0)
         for phase, h in zip(self.phases, hs):
-            Dchi += h * phase.D * phase.get_chi(self.components, potentials, self.T)
+            Dchi += h * phase.get_D_times_chi(self.components, potentials, self.T)
         return Dchi
 
     def _get_concentrations(self, etas: list[ngs.CoefficientFunction],
@@ -263,7 +263,7 @@ l : float
 
         self.a = ngs.BilinearForm(self.fes)
         forms = 1/self.dt * (etas-self.gfetas_old) * detas * ngs.dx
-        forms += self.L * (omega * ngs.dx).Diff(etas, detas)
+        forms += (self.L * omega * ngs.dx).Diff(etas, detas)
         if self.mass_conservation:
             print("len c = ", n_c)
             assert n_c == 2, "more components still need to be implememented " + str(n_c)
