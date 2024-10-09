@@ -96,7 +96,7 @@ class Phase:
         assert len(components) == 2, "TODO: implement for more than two components"
         c = concentrations[components[0]]
         c = ngs.IfPos(c-1e-9, c, 1e-9)
-        if callable(self.D):
+        if callable(self.D) and not isinstance(self.D, ngs.CF):
             D = self.D(c)
         else:
             D = self.D
@@ -107,7 +107,7 @@ class Phase:
         assert len(components) == 2, "TODO: implement for more than two components"
         c = concentrations[components[0]]
         c = ngs.IfPos(c-1e-9, c, 1e-9)
-        if callable(self.D):
+        if callable(self.D) and not isinstance(self.D, ngs.CF):
             D = self.D(c)
         else:
             D = self.D

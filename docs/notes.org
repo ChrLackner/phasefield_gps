@@ -91,7 +91,7 @@ where $f_i$ is the Helmholtz free energy density of phase $i$ and $\mu_k$ is the
 In an ideal solution model, the free energy is a weighted average of the pure substance free energies of A and B plus an entropy of mixing term [cite:@PhysRevE.84.031601]:
 
 $$
-f_i(T,c) = (1-c) f_i^A(T) + c f_i^B(T) + RT \left[ c \ln c + (1-c) \ln (1-c) \right]
+f_i(T,c) = (1-c) f_i^A(T) + c f_i^B(T) + s_i RT \left[ c \ln c + (1-c) \ln (1-c) \right]
 $$
 with $c$ the atomic fraction of $B$. ($f_i$ in $J/\text{mol}$)
 
@@ -102,15 +102,16 @@ c_K = 1 - \sum_{k=1}^{K-1} c_k
 $$
 
 \begin{align*}
-f_i(T,c) =& \sum_{k=1}^{K} c_k f_i^k(T) + RT \sum_{k=1}^{K} c_k \ln c_k
+f_i(T,c) =& \sum_{k=1}^{K} c_k f_i^k(T) + s_i RT \sum_{k=1}^{K} c_k \ln c_k
 \end{align*}
 
+with $s_i$ is the site constant for phase $i$ and $R$ the gas constant.
 
 With defining $\epsilon_i^k = f_i^k(T) - f_i^K(T)$, the chemical potential is
 
 
 $$
-\mu_k = \frac{\partial f_i(T,c)}{\partial c_k} = \epsilon_i^k + R T \ln{\left(\frac{c_k}{1-\sum_{l=1}^{K-1} c_l}\right)} = \epsilon_i^k + R T \ln{\left(\frac{c_k}{c_K}\right)}
+\mu_k = \frac{\partial f_i(T,c)}{\partial c_k} = \epsilon_i^k + s_i R T \ln{\left(\frac{c_k}{1-\sum_{l=1}^{K-1} c_l}\right)} = \epsilon_i^k + s_i R T \ln{\left(\frac{c_k}{c_K}\right)}
 $$
 
 with $\mu$ in $J/\text{mol}$.
@@ -153,6 +154,22 @@ L = \frac{ \sum_{i=1}^N \sum_{j=1 i!=j}^N L_{ij} \eta_i^2 \eta_j^2 }{ \sum_{i=1}
 $$
 
 with $L_{ij}$ a mobility coefficient for the interface between phases $i$ and $j$.
+
+\begin{align*}
+\frac{\delta \Omega}{\delta \eta_i} &= \frac{\partial \Omega}{\partial \eta_i} + \sum_{k=1}^K \frac{\partial \Omega}{\partial \mu_k}\frac{\partial \mu_k}{\partial \eta_i}
+\end{align*}
+
+\begin{align*}
+\frac{\partial \Omega}{\partial \mu_k} = -\sum_{i=1}^N \frac{\partial \rho_k}{\partial \mu_k} h_i = -\sum_{i=1}^N \chi_{kk} h_i
+\end{align*}
+
+we currently approximate the derivative of the chemical potential with respect to the order parameter as the difference between the chemical potential at $\eta_i = 1$ and $\eta_j = 1$.
+
+So this gives in total:
+
+\begin{align*}
+\frac{\partial \eta_i}{\partial t} = -L \left( \frac{\partial \Omega}{\partial \eta_i} - \sum_{k=1}^K \sum_{j=1}^N \chi_{kk} h_j \chi_{kk} \frac{\partial \mu_k}{\partial \eta_i} \right)
+\end{align*}
 
 ** Chemical potentials
 
@@ -199,13 +216,32 @@ $$
 
 * Appendix
 
+** Table of Units
+
+| Quantity | Unit | SI |
+|----------|------|----|
+| $\eta$ | - | - |
+| $\rho$ | $\text{mol}/\text{m}^3$ | $10^{30} \text{mol}/\text{m}^3$ |
+| $\mu$ | $\text{J}/\text{mol}$ | $10^3 \text{J}/\text{mol}$ |
+| $f$ | $\text{J}/\text{mol}$ | $10^3 \text{J}/\text{mol}$ |
+| $c$ | - | - |
+| $T$ | K | K |
+| $R$ | $\text{J}/\text{mol K}$ | $10^3 \text{J}/\text{mol K}$ |
+| $s$ | - | - |
+| $V_m$ | $\text{m}^3/\text{mol}$ | $10^{-6} \text{m}^3/\text{mol}$ |
+| $D$ | $\text{m}^2/\text{s}$ | $10^{-12} \text{m}^2/\text{s}$ |
+| $\kappa$ | $\text{J}/\text{m}^2$ | $10^{-6} \text{J}/\text{m}^2$ |
+| $L$ | $\text{J}/\text{m}^2$ | $10^{-6} \text{J}/\text{m}^2$ |
+| $m$ | $\text{J}/\text{m}^3$ | $10^{-6} \text{J}/\text{m}^3$ |
+
+
 ** Inversion of chemical potential
 
 \begin{align*}
-\mu_k = \epsilon_i^k + R T \ln{\left(\frac{c_k}{1-\sum_{l=1}^{K-1} c_l}\right)} = \epsilon_i^k + R T \ln{\left(\frac{c_k}{c_K}\right)} \\
-\frac{\mu_k - \epsilon_i^k}{R T} = \ln{\left(\frac{c_k}{c_K}\right)} \\
-\exp{\frac{\mu_k - \epsilon_i^k}{R T}} = \frac{c_k}{c_K} \\
-c_k = c_K \exp{\frac{\mu_k - \epsilon_i^k}{R T}}
+\mu_k = \epsilon_i^k + s_i R T \ln{\left(\frac{c_k}{1-\sum_{l=1}^{K-1} c_l}\right)} = \epsilon_i^k + s_i R T \ln{\left(\frac{c_k}{c_K}\right)} \\
+\frac{\mu_k - \epsilon_i^k}{s_i R T} = \ln{\left(\frac{c_k}{c_K}\right)} \\
+\exp{\frac{\mu_k - \epsilon_i^k}{s_i R T}} = \frac{c_k}{c_K} \\
+c_k = c_K \exp{\frac{\mu_k - \epsilon_i^k}{s_i R T}}
 \end{align*}
 
 using 
@@ -213,7 +249,7 @@ $$
 c_K = 1 - \sum_{l=1}^{K-1} c_l
 $$
 
-and defining $\alpha_i^k := e^{\frac{\mu_k - \epsilon_i^k}{R T}}$ we get
+and defining $\alpha_i^k := e^{\frac{\mu_k - \epsilon_i^k}{s_i R T}}$ we get
 
 \begin{align*}
 \frac{1+\alpha_i^k}{\alpha_i^k} c_k = 1-\sum_{l=1, l!=k}^{K-1} c_l
@@ -223,31 +259,31 @@ and defining $\alpha_i^k := e^{\frac{\mu_k - \epsilon_i^k}{R T}}$ we get
 ** Derivation of susceptibility 
 
 \begin{align*}
-\chi(\eta, \mu) = \frac{\partial \rho}{\partial \mu} = \frac{1}{V_m} \frac{\partial c(\eta, \mu)}{\partial \mu} = \frac{1}{V_m} \sum_{i=1}^N h_i(\eta) \frac{\partial c_i(\mu)}{\partial \mu} = \\
- = \frac{1}{V_m} \sum_{i=1}^N h_i(\eta) \frac{\partial}{\partial \mu}\left( \frac{\exp{\frac{\mu - \epsilon_i}{R T}}}{1 + \exp{\frac{\mu - \epsilon_i}{R T}}} \right)
+\chi_{k,l}(\eta, \mu) = \frac{\partial \rho_k}{\partial \mu_l} = \frac{1}{V_m} \frac{\partial c_k(\eta, \mu)}{\partial \mu_l} = \frac{1}{V_m} \sum_{i=1}^N h_i(\eta) \frac{\partial c_k(\mu)}{\partial \mu_l} = \\
+ = \frac{1}{V_m} \sum_{i=1}^N h_i(\eta) \frac{\partial}{\partial \mu_l}\left( \frac{\exp{\frac{\mu_k - \epsilon^k_i}{s_i R T}}}{1 + \exp{\frac{\mu_k - \epsilon^k_i}{s_i R T}}} \right)
 \end{align*}
 
 define
 $$
-\alpha_i := \frac{\mu - \epsilon_i}{R T}
+\alpha^k_i := \frac{\mu_k - \epsilon^k_i}{s_i R T}
 $$
 
 then
 
 \begin{align*}
-\frac{\partial c_i}{\partial \mu} &= \frac{\partial c_i}{\partial \alpha_i} \frac{\partial \alpha_i}{\partial \mu} = \frac{\exp{\alpha_i} (1+\exp{\alpha_i}) - \exp{\alpha_i} \exp{\alpha_i}}{(1+\exp{\alpha_i})^2} \frac{1}{R T} = \\
-&= \frac{1}{R T} \frac{\exp{\alpha_i}}{(1+\exp{\alpha_i})^2}
+\frac{\partial c_k}{\partial \mu_l} &= \delta_{kl} \frac{\partial c_k}{\partial \alpha_i^k} \frac{\partial \alpha_i^k}{\partial \mu_k} = \frac{\exp{\alpha^k_i} (1+\exp{\alpha^k_i}) - \exp{\alpha^k_i} \exp{\alpha^k_i}}{(1+\exp{\alpha^k_i})^2} \frac{1}{s_i R T} = \\
+&= \frac{1}{s_i R T} \frac{\exp{\alpha^k_i}}{(1+\exp{\alpha^k_i})^2}
 \end{align*}
 and
 
 $$
-c_i (1-c_i) = \frac{\exp{\alpha_i}}{1+\exp{\alpha_i}} \frac{1+\exp{\alpha_i} - \exp{\alpha_i}}{1+\exp{\alpha_i}} = \frac{\exp{\alpha_i}}{(1+\exp{\alpha_i})^2}
+c_k (1-c_k) = \frac{\exp{\alpha^k_i}}{1+\exp{\alpha^k_i}} \frac{1+\exp{\alpha^k_i} - \exp{\alpha^k_i}}{1+\exp{\alpha^k_i}} = \frac{\exp{\alpha^k_i}}{(1+\exp{\alpha^k_i})^2}
 $$
 
 therefore
 
 $$
-\chi(\eta, \mu) = \frac{1}{V_m R T} \sum_{i=1}^N h_i(\eta) c_i(\mu) (1-c_i(\mu))
+\chi_{kl}(\eta, \mu) = \delta{kl} \sum_{i=1}^N h_i(\eta) \frac{1}{V_m s_i R T} c^i_k(\mu) (1-c^i_k(\mu))
 $$
 
 

@@ -1,4 +1,4 @@
-% Created 2024-02-07 Wed 10:39
+% Created 2024-08-19 Mon 09:25
 % Intended LaTeX compiler: pdflatex
 \documentclass[11pt]{article}
 \usepackage[utf8]{inputenc}
@@ -37,7 +37,7 @@ todo: Document strict mass conservation
 todo: Anisotropy
 
 \section{Grand Potential}
-\label{sec:org8ce78dc}
+\label{sec:org9b950ef}
 
 Most of this is taken from (\citeprocitem{1}{Aagesen et al. 2018}).
 
@@ -62,7 +62,7 @@ $$
 $$
 
 \subsection{Multiwell potential}
-\label{sec:org8d3e4f4}
+\label{sec:orgf73f7a9}
 
 
 (\citeprocitem{3}{Moelans, Blanpain, and Wollants 2008}) proposed a homogeneous free energy \(\omega_{mw}\) of the form 
@@ -80,7 +80,7 @@ $$
 Interfacial anisotropy can be included by making \(\gamma_{ij}\) dependent on the interface orientation.
 
 \subsection{The gradient contribution}
-\label{sec:org815b553}
+\label{sec:orgfe87ecd}
 
 The gradient contribution \(\omega_{grad}\) is defined as
 
@@ -89,7 +89,7 @@ $$
 $$
 
 \subsection{The chemical contribution}
-\label{sec:orgdf31936}
+\label{sec:orgf6f89d5}
 
 The chemical contribution \(\omega_{chem}\) is defined as
 
@@ -114,17 +114,17 @@ $$
 where \(f_i\) is the Helmholtz free energy density of phase \(i\) and \(\mu_k\) is the chemical potential difference between species \(k\) and the solvent.
 
 \subsection{Free energy functions}
-\label{sec:org53ce4c1}
+\label{sec:orgc61a2eb}
 
 \subsubsection{Ideal solution model}
-\label{sec:org80f6a94}
+\label{sec:org64a5d99}
 
 \todo{Binary for now, generalize later. -> only one species with concentration $c$ and solvent $1-c$.}
 
 In an ideal solution model, the free energy is a weighted average of the pure substance free energies of A and B plus an entropy of mixing term (\citeprocitem{5}{Plapp 2011}):
 
 $$
-f_i(T,c) = (1-c) f_i^A(T) + c f_i^B(T) + RT \left[ c \ln c + (1-c) \ln (1-c) \right]
+f_i(T,c) = (1-c) f_i^A(T) + c f_i^B(T) + s_i RT \left[ c \ln c + (1-c) \ln (1-c) \right]
 $$
 with \(c\) the atomic fraction of \(B\). (\(f_i\) in \(J/\text{mol}\))
 
@@ -135,15 +135,16 @@ c_K = 1 - \sum_{k=1}^{K-1} c_k
 $$
 
 \begin{align*}
-f_i(T,c) =& \sum_{k=1}^{K} c_k f_i^k(T) + RT \sum_{k=1}^{K} c_k \ln c_k
+f_i(T,c) =& \sum_{k=1}^{K} c_k f_i^k(T) + s_i RT \sum_{k=1}^{K} c_k \ln c_k
 \end{align*}
 
+with \(s_i\) is the site constant for phase \(i\) and \(R\) the gas constant.
 
 With defining \(\epsilon_i^k = f_i^k(T) - f_i^K(T)\), the chemical potential is
 
 
 $$
-\mu_k = \frac{\partial f_i(T,c)}{\partial c_k} = \epsilon_i^k + R T \ln{\left(\frac{c_k}{1-\sum_{l=1}^{K-1} c_l}\right)} = \epsilon_i^k + R T \ln{\left(\frac{c_k}{c_K}\right)}
+\mu_k = \frac{\partial f_i(T,c)}{\partial c_k} = \epsilon_i^k + s_i R T \ln{\left(\frac{c_k}{1-\sum_{l=1}^{K-1} c_l}\right)} = \epsilon_i^k + s_i R T \ln{\left(\frac{c_k}{c_K}\right)}
 $$
 
 with \(\mu\) in \(J/\text{mol}\).
@@ -166,13 +167,13 @@ $$
 \chi_{kl}(\eta, \mu) = \frac{\partial \rho_k}{\partial \mu_l} = \frac{1}{V_m R T} \sum_{i=1}^N h_i(\eta) c_i(\mu) (1-c_i(\mu))
 $$
 
-for details see \hyperref[sec:org9947c31]{Derivation of susceptibility}.
+for details see \hyperref[sec:orga844052]{Derivation of susceptibility}.
 
 \section{Evolution Equations}
-\label{sec:org99d6c42}
+\label{sec:org4961ef6}
 
 \subsection{Phase order parameters}
-\label{sec:org69053db}
+\label{sec:org246fdcc}
 
 Each order parameter \(\eta_i\) evolves by an Allen-Cahn equation
 
@@ -189,8 +190,24 @@ $$
 
 with \(L_{ij}\) a mobility coefficient for the interface between phases \(i\) and \(j\).
 
+\begin{align*}
+\frac{\delta \Omega}{\delta \eta_i} &= \frac{\partial \Omega}{\partial \eta_i} + \sum_{k=1}^K \frac{\partial \Omega}{\partial \mu_k}\frac{\partial \mu_k}{\partial \eta_i}
+\end{align*}
+
+\begin{align*}
+\frac{\partial \Omega}{\partial \mu_k} = -\sum_{i=1}^N \frac{\partial \rho_k}{\partial \mu_k} h_i = -\sum_{i=1}^N \chi_{kk} h_i
+\end{align*}
+
+we currently approximate the derivative of the chemical potential with respect to the order parameter as the difference between the chemical potential at \(\eta_i = 1\) and \(\eta_j = 1\).
+
+So this gives in total:
+
+\begin{align*}
+\frac{\partial \eta_i}{\partial t} = -L \left( \frac{\partial \Omega}{\partial \eta_i} - \sum_{k=1}^K \sum_{j=1}^N \chi_{kk} h_j \chi_{kk} \frac{\partial \mu_k}{\partial \eta_i} \right)
+\end{align*}
+
 \subsection{Chemical potentials}
-\label{sec:org8abcd58}
+\label{sec:org3bc8283}
 
 In the case when all interdiffusivities are zero we get
 
@@ -203,10 +220,10 @@ $$
 \chi_{kl} = \frac{\partial \rho_k}{\partial \mu_l}
 $$
 
-for details see \hyperref[sec:org667b947]{Derivation of evolution equation for chemical potential}.
+for details see \hyperref[sec:orgb8d1e50]{Derivation of evolution equation for chemical potential}.
 
 \section{Calculation of Model Parameters}
-\label{sec:org0eca2bd}
+\label{sec:orgbd4346e}
 
 from (\citeprocitem{3}{Moelans, Blanpain, and Wollants 2008}):
 
@@ -225,7 +242,7 @@ m = \frac{\sigma_{gb}}{l_{gb}} \frac{1}{\sqrt{f_{0,\text{interf}}(\gamma)}} \app
 $$
 
 \section{Anisotropy}
-\label{sec:org47bd327}
+\label{sec:org3e3dd88}
 
 From (\citeprocitem{2}{McFadden et al. 1993}):
 
@@ -236,16 +253,40 @@ $$
 $$
 
 \section{Appendix}
-\label{sec:org536ee52}
+\label{sec:org9afb58f}
+
+\subsection{Table of Units}
+\label{sec:org242c115}
+
+\begin{center}
+\begin{tabular}{lll}
+Quantity & Unit & SI\\[0pt]
+\hline
+\(\eta\) & - & -\\[0pt]
+\(\rho\) & \(\text{mol}/\text{m}^3\) & \(10^{30} \text{mol}/\text{m}^3\)\\[0pt]
+\(\mu\) & \(\text{J}/\text{mol}\) & \(10^3 \text{J}/\text{mol}\)\\[0pt]
+\(f\) & \(\text{J}/\text{mol}\) & \(10^3 \text{J}/\text{mol}\)\\[0pt]
+\(c\) & - & -\\[0pt]
+\(T\) & K & K\\[0pt]
+\(R\) & \(\text{J}/\text{mol K}\) & \(10^3 \text{J}/\text{mol K}\)\\[0pt]
+\(s\) & - & -\\[0pt]
+\(V_m\) & \(\text{m}^3/\text{mol}\) & \(10^{-6} \text{m}^3/\text{mol}\)\\[0pt]
+\(D\) & \(\text{m}^2/\text{s}\) & \(10^{-12} \text{m}^2/\text{s}\)\\[0pt]
+\(\kappa\) & \(\text{J}/\text{m}^2\) & \(10^{-6} \text{J}/\text{m}^2\)\\[0pt]
+\(L\) & \(\text{J}/\text{m}^2\) & \(10^{-6} \text{J}/\text{m}^2\)\\[0pt]
+\(m\) & \(\text{J}/\text{m}^3\) & \(10^{-6} \text{J}/\text{m}^3\)\\[0pt]
+\end{tabular}
+\end{center}
+
 
 \subsection{Inversion of chemical potential}
-\label{sec:org8e0814f}
+\label{sec:orgc74b4cc}
 
 \begin{align*}
-\mu_k = \epsilon_i^k + R T \ln{\left(\frac{c_k}{1-\sum_{l=1}^{K-1} c_l}\right)} = \epsilon_i^k + R T \ln{\left(\frac{c_k}{c_K}\right)} \\
-\frac{\mu_k - \epsilon_i^k}{R T} = \ln{\left(\frac{c_k}{c_K}\right)} \\
-\exp{\frac{\mu_k - \epsilon_i^k}{R T}} = \frac{c_k}{c_K} \\
-c_k = c_K \exp{\frac{\mu_k - \epsilon_i^k}{R T}}
+\mu_k = \epsilon_i^k + s_i R T \ln{\left(\frac{c_k}{1-\sum_{l=1}^{K-1} c_l}\right)} = \epsilon_i^k + s_i R T \ln{\left(\frac{c_k}{c_K}\right)} \\
+\frac{\mu_k - \epsilon_i^k}{s_i R T} = \ln{\left(\frac{c_k}{c_K}\right)} \\
+\exp{\frac{\mu_k - \epsilon_i^k}{s_i R T}} = \frac{c_k}{c_K} \\
+c_k = c_K \exp{\frac{\mu_k - \epsilon_i^k}{s_i R T}}
 \end{align*}
 
 using 
@@ -253,7 +294,7 @@ $$
 c_K = 1 - \sum_{l=1}^{K-1} c_l
 $$
 
-and defining \(\alpha_i^k := e^{\frac{\mu_k - \epsilon_i^k}{R T}}\) we get
+and defining \(\alpha_i^k := e^{\frac{\mu_k - \epsilon_i^k}{s_i R T}}\) we get
 
 \begin{align*}
 \frac{1+\alpha_i^k}{\alpha_i^k} c_k = 1-\sum_{l=1, l!=k}^{K-1} c_l
@@ -261,41 +302,41 @@ and defining \(\alpha_i^k := e^{\frac{\mu_k - \epsilon_i^k}{R T}}\) we get
 
 
 \subsection{Derivation of susceptibility}
-\label{sec:org9947c31}
+\label{sec:orga844052}
 
 \begin{align*}
-\chi(\eta, \mu) = \frac{\partial \rho}{\partial \mu} = \frac{1}{V_m} \frac{\partial c(\eta, \mu)}{\partial \mu} = \frac{1}{V_m} \sum_{i=1}^N h_i(\eta) \frac{\partial c_i(\mu)}{\partial \mu} = \\
- = \frac{1}{V_m} \sum_{i=1}^N h_i(\eta) \frac{\partial}{\partial \mu}\left( \frac{\exp{\frac{\mu - \epsilon_i}{R T}}}{1 + \exp{\frac{\mu - \epsilon_i}{R T}}} \right)
+\chi_{k,l}(\eta, \mu) = \frac{\partial \rho_k}{\partial \mu_l} = \frac{1}{V_m} \frac{\partial c_k(\eta, \mu)}{\partial \mu_l} = \frac{1}{V_m} \sum_{i=1}^N h_i(\eta) \frac{\partial c_k(\mu)}{\partial \mu_l} = \\
+ = \frac{1}{V_m} \sum_{i=1}^N h_i(\eta) \frac{\partial}{\partial \mu_l}\left( \frac{\exp{\frac{\mu_k - \epsilon^k_i}{s_i R T}}}{1 + \exp{\frac{\mu_k - \epsilon^k_i}{s_i R T}}} \right)
 \end{align*}
 
 define
 $$
-\alpha_i := \frac{\mu - \epsilon_i}{R T}
+\alpha^k_i := \frac{\mu_k - \epsilon^k_i}{s_i R T}
 $$
 
 then
 
 \begin{align*}
-\frac{\partial c_i}{\partial \mu} &= \frac{\partial c_i}{\partial \alpha_i} \frac{\partial \alpha_i}{\partial \mu} = \frac{\exp{\alpha_i} (1+\exp{\alpha_i}) - \exp{\alpha_i} \exp{\alpha_i}}{(1+\exp{\alpha_i})^2} \frac{1}{R T} = \\
-&= \frac{1}{R T} \frac{\exp{\alpha_i}}{(1+\exp{\alpha_i})^2}
+\frac{\partial c_k}{\partial \mu_l} &= \delta_{kl} \frac{\partial c_k}{\partial \alpha_i^k} \frac{\partial \alpha_i^k}{\partial \mu_k} = \frac{\exp{\alpha^k_i} (1+\exp{\alpha^k_i}) - \exp{\alpha^k_i} \exp{\alpha^k_i}}{(1+\exp{\alpha^k_i})^2} \frac{1}{s_i R T} = \\
+&= \frac{1}{s_i R T} \frac{\exp{\alpha^k_i}}{(1+\exp{\alpha^k_i})^2}
 \end{align*}
 and
 
 $$
-c_i (1-c_i) = \frac{\exp{\alpha_i}}{1+\exp{\alpha_i}} \frac{1+\exp{\alpha_i} - \exp{\alpha_i}}{1+\exp{\alpha_i}} = \frac{\exp{\alpha_i}}{(1+\exp{\alpha_i})^2}
+c_k (1-c_k) = \frac{\exp{\alpha^k_i}}{1+\exp{\alpha^k_i}} \frac{1+\exp{\alpha^k_i} - \exp{\alpha^k_i}}{1+\exp{\alpha^k_i}} = \frac{\exp{\alpha^k_i}}{(1+\exp{\alpha^k_i})^2}
 $$
 
 therefore
 
 $$
-\chi(\eta, \mu) = \frac{1}{V_m R T} \sum_{i=1}^N h_i(\eta) c_i(\mu) (1-c_i(\mu))
+\chi_{kl}(\eta, \mu) = \delta{kl} \sum_{i=1}^N h_i(\eta) \frac{1}{V_m s_i R T} c^i_k(\mu) (1-c^i_k(\mu))
 $$
 
 
 
 
 \subsection{Derivation of evolution equation for chemical potential}
-\label{sec:org667b947}
+\label{sec:orgb8d1e50}
 
 From the generalized diffusion equation
 
@@ -339,7 +380,7 @@ $$
 
 
 \section{Bibliography}
-\label{sec:org98c8b83}
+\label{sec:org5518afe}
 
 \begin{hangparas}{1.5em}{1}
 \hypertarget{citeproc_bib_item_1}{Aagesen, Larry K., Yipeng Gao, Daniel Schwen, and Karim Ahmed. 2018. “Grand-Potential-Based Phase-Field Model for Multiple Phases, Grains, and Chemical Components.” \textit{Phys. Rev. E} 98 (2): 023309. \url{https://doi.org/10.1103/PhysRevE.98.023309}.}

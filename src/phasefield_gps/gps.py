@@ -110,11 +110,16 @@ l : float
     def sigma(self, etas: list[ngs.CoefficientFunction] | None = None) \
             -> ngs.CoefficientFunction | float:
         # TODO: implement for more than 2 phases
-        sigma = self.phases[1].\
-            get_surface_energy(self.phases[0],
-                               # (None if etas is None else ngs.grad(etas)[0,:]))
-                               # (None if etas is None else ngs.grad(self.gfetas)[0,:]))
-                               False if etas == False else ngs.Grad(self.gfetas_old)[0,:])
+        if etas is None or etas == False:
+            return self.phases[1].get_surface_energy(self.phases[0], False)
+        sigma_ij = {}
+        for i, eta1 in enumerate(etas):
+            for j, eta2 in enumerate(etas):
+                if j > i:
+                    sigma_ij[(i,j)] = self.phases[j].get_surface_energy(self.phases[i], False if etas == False else ngs.Grad(self.gfetas_old)[i,:])
+        sum_gfs = ngs.sum(eta1**2 * eta2**2 for i, eta1 in enumerate(self.gfetas_old) for j,eta2 in enumerate(self.gfetas_old[i+1:]))
+        sigma = ngs.IfPos(sum_gfs, ngs.sum(sigma_ij[(i,i+1+j)] * eta1**2 * eta2**2 for i, eta1 in enumerate(self.gfetas_old) for j, eta2 in enumerate(self.gfetas_old[i+1:])) / sum_gfs, self.phases[1].get_surface_energy(self.phases[0], False))
+
         # if etas is not None:
         #     ngs.Draw(ngs.grad(self.gfetas)[0,:], self.mesh, "grad")
         # ngs.Draw(sigma, self.mesh, "sigma")
@@ -157,7 +162,8 @@ l : float
             -> ngs.CoefficientFunction:
         if etas is None:
             etas = self.gfetas
-        return ngs.CF(self.m(etas) * (sum((eta**4/4-eta**2/2) for eta in etas) + sum(sum(self.gamma[i,j] * eta1**2 * eta2**2 for j,eta1 in enumerate(etas) if j > i) for i,eta2 in enumerate(etas)) + 0.25))
+        # return ngs.CF(self.m(etas) * (sum((eta**4/4-eta**2/2) for eta in etas) + sum(sum(self.gamma[i,j] * eta1**2 * eta2**2 for j,eta1 in enumerate(etas) if j > i) for i,eta2 in enumerate(etas)) + 0.25))
+        return ngs.CF(self.m() * (sum((eta**4/4-eta**2/2) for eta in etas) + sum(sum(self.gamma[i,j] * eta1**2 * eta2**2 for j,eta1 in enumerate(etas) if j > i) for i,eta2 in enumerate(etas)) + 0.25))
 
     def get_gradient_energy(self, etas: list[ngs.CoefficientFunction] | None = None) \
             -> ngs.CoefficientFunction:
@@ -199,9 +205,17 @@ l : float
 
     def get_D_times_chi(self, etas, potentials) -> ngs.CoefficientFunction:
         hs = self.h(etas)
-        Dchi = ngs.CF(0)
+        Dchi = None
         for phase, h in zip(self.phases, hs):
-            Dchi += h * phase.get_D_times_chi(self.components, potentials, self.T)
+            Dchii = h * phase.get_D_times_chi(self.components, potentials, self.T)
+            if Dchi is None:
+                Dchi = Dchii
+            else:
+                if Dchi.dim == 1 and Dchii.dim != 1:
+                    Dchi = Dchi * ngs.Id(Dchii.dims[0])
+                if Dchii.dim == 1 and Dchi.dim != 1:
+                    Dchii = Dchii * ngs.Id(Dchi.dims[0])
+                Dchi += Dchii
         return Dchi
 
     def _get_concentrations(self, etas: list[ngs.CoefficientFunction],
@@ -267,15 +281,13 @@ l : float
         if self.mass_conservation:
             print("len c = ", n_c)
             assert n_c == 2, "more components still need to be implememented " + str(n_c)
-            mu0 = self.phases[0].get_potentials(
-                concentrations={ self.components[0] : c[0],
-                                 self.components[1] : None },
-                solvent=self.components[1], T=self.T)[self.components[0]]
-            mu1 = self.phases[1].get_potentials(
-                concentrations={ self.components[0] : c[0],
-                                 self.components[1] : None },
-                solvent=self.components[1], T=self.T)[self.components[0]]
-            dmudphi = ngs.CF((mu0-mu1,mu1-mu0))
+            mui = []
+            for i in range(len(self.phases)):
+                mui.append(self.phases[i].get_potentials(
+                    concentrations={ self.components[0] : c[0],
+                                     self.components[1] : None },
+                    solvent=self.components[1], T=self.T)[self.components[0]])
+            dmudphi = ngs.CF(tuple(mui))
             chi = self.get_chi(etas, w)
             forms += 8.314 * self.T * self.L * w[0] * chi * dmudphi * detas * ngs.dx
         else:
@@ -290,7 +302,7 @@ l : float
             Dchi = self.get_D_times_chi(etas, w)
             for wi, dci in zip(w, dc):
                 # forms += self.Vm * Dchi * ngs.InnerProduct(ngs.grad(wi),ngs.grad(dci)) * ngs.dx
-                forms += Dchi * ngs.InnerProduct(ngs.grad(wi),ngs.grad(dci)) * ngs.dx
+                forms += ngs.InnerProduct(ngs.grad(wi),Dchi * ngs.grad(dci)) * ngs.dx
             for ci, dwi in zip(c, dw):
                 forms += (concentrations[self.components[0]] - ci) * dwi * ngs.dx
         else:
@@ -299,7 +311,7 @@ l : float
             # forms += self.Vm * chi * 1/self.dt * (w[0]-self.gfw_old[0]) * dw * ngs.dx
             # forms += self.Vm * Dchi * ngs.InnerProduct(ngs.grad(w[0]),ngs.grad(dw[0])) * ngs.dx
             forms += chi * 1/self.dt * (w[0]-self.gfw_old[0]) * dw * ngs.dx
-            forms += Dchi * ngs.InnerProduct(ngs.grad(w[0]),ngs.grad(dw[0])) * ngs.dx
+            forms += ngs.InnerProduct(ngs.grad(w[0]),Dchi * ngs.grad(dw[0])) * ngs.dx
             rho = 1/self.Vm * concentrations[self.components[0]]
             for etai in list_etas:
                 etai.MakeVariable()
@@ -430,7 +442,7 @@ Initial conditions for phase. For components, for each phase an initial conditio
                                                    inverse="pardiso")
         try:
             store_gf_old = self.gf_old.vec.Copy()
-            solver.Solve(maxerr=1e-9, printing=self.print_newton, callback=callback)
+            solver.Solve(maxerr=1e-6, printing=self.print_newton, callback=callback)
             if self.timestepping_tolerance is not None:
                 self._gf_coarse.vec.data = self.gf.vec
                 energy_coarse = self.get_energy(self._gfetas_coarse, self._gfw_coarse)
