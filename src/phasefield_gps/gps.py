@@ -279,7 +279,6 @@ l : float
         forms = 1/self.dt * (etas-self.gfetas_old) * detas * ngs.dx
         forms += (self.L * omega * ngs.dx).Diff(etas, detas)
         if self.mass_conservation:
-            print("len c = ", n_c)
             assert n_c == 2, "more components still need to be implememented " + str(n_c)
             mui = []
             for i in range(len(self.phases)):
@@ -412,7 +411,7 @@ Initial conditions for phase. For components, for each phase an initial conditio
         c1, c2 = self.components
         assert type(c1) == IdealSolutionComponent and type(c2) == IdealSolutionComponent
         for phase in self.phases:
-            c_vals = np.linspace(0, 1, 100)[1:-1]
+            c_vals = np.linspace(0, 1, 1001)[1:-1]
             # e_vals = [c * c1.phase_energies[phase] + (1-c) * c2.phase_energies[phase] + phase.site_variable * 8.314 * self.T.Get() * (c*ngs.log(c) + (1-c) * ngs.log(1-c))for c in c_vals]
             e_vals = [phase.get_chemical_energy({ self.components[0] : c, self.components[1]: 1-c }, self.T.Get(), use_ifpos=False) for c in c_vals]
             ind = e_vals.index(min(e_vals))
@@ -442,7 +441,7 @@ Initial conditions for phase. For components, for each phase an initial conditio
                                                    inverse="pardiso")
         try:
             store_gf_old = self.gf_old.vec.Copy()
-            solver.Solve(maxerr=1e-6, printing=self.print_newton, callback=callback)
+            solver.Solve(maxerr=1e-9, printing=self.print_newton, callback=callback)
             if self.timestepping_tolerance is not None:
                 self._gf_coarse.vec.data = self.gf.vec
                 energy_coarse = self.get_energy(self._gfetas_coarse, self._gfw_coarse)

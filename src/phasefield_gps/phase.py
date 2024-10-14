@@ -13,7 +13,7 @@ def argmax(x,f):
     return res
 
 # Gas constant
-R = 8.314 # J/mol/K
+R = 8.31446261815324 # J/mol/K
 
 class Phase:
     def __init__(self, name: str, diffusion_coefficient: float | Callable,
