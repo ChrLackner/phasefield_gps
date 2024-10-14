@@ -6,7 +6,7 @@ liquid = Phase("liquid", diffusion_coefficient=3e-7,
                site_variable=1.7892)    #3e-7
 solid = Phase("solid", diffusion_coefficient=3e-12,     #3e-12
               surface_energies={ liquid : 2.451e4 },
-              site_variable=2.) # J/m**2
+              site_variable=2) # J/m**2
 
 # fosterite_liquid = { 1373.15: -2280010.,
 #                      1773.15: -2434149.,
@@ -52,7 +52,7 @@ model = GrandPotentialSolver(mesh=mesh,
                              phases=[liquid, solid],
                              molar_volume=4.3e-5, # m**3/mol
                              interface_mobility=1e-13,  # m**4/J/s
-                             temperature=1500, # 2173.15, # K
+                             temperature=1773.15, # 2173.15, # K
                              interface_width=5e-5) # m
 
 model.mass_conservation = True
@@ -66,10 +66,10 @@ shift = 0 #0.4e-3
 # ic_concentrations = { fayalite: { liquid: 0.999,
 #                                    solid: 0.98 }}
 # ic_concentrations = { fayalite: { liquid: 0.4, solid: 0.6 }}
-ic_concentrations = { fayalite: { liquid: 0.55, solid: 0.55 }}
+ic_concentrations = { fosterite: { liquid: 0.4, solid: 0.4 }}
 
-ic_concentrations[fosterite] = { liquid: 1-ic_concentrations[fayalite][liquid],
-                                 solid: 1-ic_concentrations[fayalite][solid] }
+ic_concentrations[fayalite] = { liquid: 1-ic_concentrations[fosterite][liquid],
+                                 solid: 1-ic_concentrations[fosterite][solid] }
 
 print(model.m(False)/model.kappa(False))
 ic_liquid = 0.5 * tanh(ngs.sqrt(model.m(False)/model.kappa(False)) * (ngs.x+shift)) + 0.5
@@ -122,10 +122,13 @@ interface_point = (0.4e-3, 0)
 
 counter = 0
 
+def cooling(time):
+    return 1773.15 
+
 def callback():
     global counter
     counter += 1
-    if counter % 3 == 0:
+    if counter % 20 == 0:
         time_vals.append(time)
         for name, func in funcs_to_plot.items():
             vals[name].append(func(mesh_pnts))
@@ -136,8 +139,9 @@ def callback():
             plt.savefig(f"{name}.png")
 
     # the first time the solve passes 0.01 sec we change the temperature
-    if model.time > 0.01 and model.T.Get() < 1800:
-        model.set_Temperature(1900)
+    # if model.time > 0.01 and model.T.Get() < 1800:
+    if True:
+        model.set_Temperature(cooling(model.time))
         fig = model.plot_energy_landscape()
         fig.savefig(f"energy_landscape_{model.T.Get()}.png")
         time_vals.append(str(time) + "_reset")
@@ -196,17 +200,18 @@ Draw(model.get_chemical_energy(), mesh, "chem_energy")
 Draw(model.get_multiwell_energy(), mesh, "mw_energy")
 Draw(model.get_energy(), mesh, "energy")
 Draw(-model.L * model.get_energy().Diff(model.gfetas), mesh, "energy_diff")
-Draw(liquid.get_chemical_potential(model.components, model.gfw, model.T),
+# Draw(liquid.get_chemical_energy(model.components, model.gfw, model.T),  # vorher:
+Draw(liquid.get_chemical_energy_from_potential(model.components, model.gfw, model.T),
      mesh, "chem_potential_liquid")
-Draw(solid.get_chemical_potential(model.components, model.gfw, model.T),
-     mesh, "chem_potential_solid")
+# Draw(solid.get_chemical_energy(model.components, model.gfw, model.T), # vorher: Draw(solid.get_chemical_potential(model.components, model.gfw, model.T), 
+#      mesh, "chem_potential_solid")
 # model.print_newton = True
 with ngs.TaskManager():
     # domega = numdiff_omega()
     # Draw(domega, mesh, "domega_numdif")
     # input("wait")
     # draw_time_curves()
-    model.set_timestep(0.002)
+    model.set_timestep(0.1)  #0.002
     # model.do_timestep()
     # callback()
     # input("wait")
