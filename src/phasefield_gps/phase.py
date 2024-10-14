@@ -112,3 +112,24 @@ class Phase:
         else:
             D = self.D
         return D * 1/(self.site_variable * R * T) * c * (1-c)
+
+    def calculate_parallel_energy_concentration(self,
+                                                concentration,
+                                                other,
+                                                temperature,
+                                                components):
+        """Computes concecentration where energy tangents match to other phases energy tangent at given concentration, only works for 2 components!"""
+        import numpy as np
+        c_vals = np.linspace(0, 1, 101)[1:-1]
+        energy_other = other.get_chemical_energy({ components[0]: concentration, components[1]: 1-concentration }, temperature, use_ifpos=False)
+        eps = 1e-6
+        c_plus = concentration + eps
+        energy_other_plus = other.get_chemical_energy({ components[0]: c_plus, components[1]: 1-c_plus }, temperature, use_ifpos=False)
+        tang = (energy_other_plus - energy_other) / eps
+        energy_me = [0.] * len(c_vals)
+        energy_me = [self.get_chemical_energy({ components[0]: c, components[1]: 1-c }, temperature, use_ifpos=False) for c in c_vals]
+        for i in range(len(c_vals)-1):
+            tang_me = (energy_me[i+1] - energy_me[i]) / (c_vals[i+1] - c_vals[i])
+            if tang_me > tang:
+                return c_vals[i]
+        return c_vals[-1]

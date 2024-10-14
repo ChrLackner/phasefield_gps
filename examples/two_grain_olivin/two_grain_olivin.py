@@ -5,13 +5,15 @@ import ngsolve.meshes as ngmeshes
 import random
 import numpy as np
 
+# this selects the seed for the random number generator
+random.seed(1)
+
 initial_temperature = 1700 # K
 end_temperature = 1373.15 # K
 cooling_rate = 0.1/3600 # K/s
 
 conc_liquid = 0.5
 conc_solid1 = 0.4
-conc_solid2 = 0.95
 
 # mesh
 nel = 50
@@ -23,10 +25,10 @@ mesh = ngmeshes.MakeStructured2DMesh(
     mapping = lambda x,y: (1e-3*x-5e-4, 1e-3*y - 5e-4))
 
 r1 = random.random() * 2 * ngs.pi
-r1 = 0
+# this fixes angle to 0:
+# r1 = 0
 mat = np.array([[np.cos(r1), -np.sin(r1)], [np.sin(r1), np.cos(r1)]])
 factor = 1e4
-random.seed(1)
 v1s = []
 v2s = []
 
@@ -41,8 +43,10 @@ directional_surface_energies = { tuple(np.dot(mat, v1)) : 2.45 * factor,
                                  tuple(np.dot(mat, v2)) : 0.5 * 2.45 * factor,
                                  tuple(np.dot(mat, v3)) : 0.83 * 2.45 * factor,
                                  tuple(np.dot(mat, v4)) : 0.83 * 2.45 * factor }
+
 r2 = random.random() * 2 * np.pi
-r2 = 30*np.pi/180
+# this fixes angle to 30 degrees
+# r2 = 30*np.pi/180
 mat2 = np.array([[np.cos(r2), -np.sin(r2)], [np.sin(r2), np.cos(r2)]])
 v1s.append(ngs.CF(tuple(np.dot(mat2, v1))))
 v2s.append(ngs.CF(tuple(np.dot(mat2, v2))))
@@ -99,6 +103,24 @@ r = 5 * 1e-5
 rx = ngs.sqrt((ngs.x+0.15e-3)**2 + ngs.y**2) - r
 rx2 = ngs.sqrt((ngs.x-0.15e-3)**2 + ngs.y**2) - r
 
+
+# compute energy diagrams for full liquid concentation
+# and from there calculate the concentration a new solid grain would be
+# created with (having parallel energy tangents)
+model.set_initial_conditions({ liquid: ngs.CF(1),
+                               solid: ngs.CF(0),
+                               solid2: ngs.CF(0) },
+                             { fosterite: { liquid: conc_liquid,
+                                            solid: 0,
+                                            solid2: 0 },
+                               fayalite: { liquid: 1 - conc_liquid,
+                                           solid: 1,
+                                           solid2: 1}})
+conc_solid2 = solid2.calculate_parallel_energy_concentration(conc_liquid,
+                                                             liquid,
+                                                             initial_temperature,
+                                                             [fosterite, fayalite])
+print("calculated concentration in solid2:", conc_solid2)
 ic_concentrations : dict[Component, dict[Phase, ngs.CF |
                                          float]] = {
                                              fosterite: { liquid: conc_liquid,
@@ -110,7 +132,6 @@ ic_concentrations[fayalite] = { liquid: 1-ic_concentrations[fosterite][liquid],
 
 tanh = lambda x: ngs.sinh(x)/ngs.cosh(x)
 ic_solid = 1-(0.5 * (1 + tanh(ngs.sqrt(model.m(False)/model.kappa(False)) * rx)))
-# ic_liquid = 0.5 * (1 + tanh(ngs.sqrt(model.m()/model.kappa()) * ngs.x))
 ic_solid2 = 1-(0.5 * (1 + tanh(ngs.sqrt(model.m(False)/model.kappa(False)) * rx2)))
 ic_liquid = 1-(ic_solid + ic_solid2)
 
