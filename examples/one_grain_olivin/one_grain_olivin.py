@@ -146,7 +146,7 @@ fosterite_plots = { "x" : [],
                     "sqrt(x^2+y^2)" : [] }
 
 import os
-os.makedirs("plots", exist_ok=True)
+os.makedirs("results", exist_ok=True)
 
 def plot_function_over_directions(func, name, value_dict):
     for key, lst in value_dict.items():
@@ -159,12 +159,13 @@ def plot_function_over_directions(func, name, value_dict):
         ax[i].set_ylabel(name)
         ax[i].set_title(f"{name} over {key}")
     plt.tight_layout()
-    fig.savefig(os.path.join("plots", f"{name}.png"))
+    fig.savefig(os.path.join("results", f"{name}.png"))
 
-if os.path.exists(os.path.join("plots", "energy")):
-    for f in os.listdir(os.path.join("plots", "energy")):
-        os.remove(os.path.join("plots", "energy", f))
-os.makedirs(os.path.join("plots", "energy"), exist_ok=True)
+if os.path.exists(os.path.join("results", "energy")):
+    for f in os.listdir(os.path.join("results", "energy")):
+        os.remove(os.path.join("results", "energy", f))
+os.makedirs(os.path.join("results", "energy"), exist_ok=True)
+
 def plot_energy_over_directions(energy, concentration):
     fig = model.plot_energy_landscape(times=3)
     ax = fig.get_axes()
@@ -176,7 +177,42 @@ def plot_energy_over_directions(energy, concentration):
         ax[i].set_ylabel("Energy")
         ax[i].set_title(f"{key}")
     plt.tight_layout()
-    fig.savefig(os.path.join("plots", "energy", f"time_{model.time:.2f}.png"))
+    fig.savefig(os.path.join("results", "energy", f"time_{model.time:.2f}.png"))
+
+output_file = os.path.join("results", "output.csv")
+with open(output_file, "w") as f:
+    f.write("time; Temp; XMg1_x; XMg2_x; XMg3_x; XMg4_x; XMg1_y; XMg2_y; XMg3_y; XMg4_y; XMg1_xy; XMg2_xy; XMg3_xy; XMg4_xy; IF Pos x; IF Pos y; IF Pos xy; GGW Liq; GGW Sol; Pot Liq; Pot Sol; Energy\n")
+def write_to_file():
+    pvals = { }
+    xmg = model.get_concentrations()[fosterite]
+    if_pos = {}
+    for key, d in dirs.items():
+        solid_vals = model.get_phase(solid)(d).flatten()
+        i1 = np.where(solid_vals > 0.9)[0][-1]
+        i2 = np.where(solid_vals < 0.1)[0][0]
+        p = [d[0], d[i1], d[i2], d[-1]]
+        pvals[key] = [xmg(p[i]) for i in range(4)]
+        if_pos[key] = 0.5 * (i1 + i2)/len(d)
+    with open(output_file, "a") as f:
+        f.write(f"{model.time:.2f}; {model.T.Get():.5f}; ")
+        for key, vals in pvals.items():
+            for v in vals:
+                f.write(f"{v:.4f}; ")
+        for key, vals in if_pos.items():
+            f.write(f"{vals:.4f}; ")
+        cvals = np.linspace(0, 1, 1001)[1:-1]
+        e_solid = [solid.get_chemical_energy({ fosterite: c, fayalite: 1-c }, model.T.Get(), use_ifpos=False) for c in cvals]
+        e_liquid = [liquid.get_chemical_energy({ fosterite: c, fayalite: 1-c }, model.T.Get(), use_ifpos=False) for c in cvals]
+        min_val_s = np.argmin(e_solid)/1001
+        min_val_l = np.argmin(e_liquid)/1001
+        f.write(f"{min_val_l:.4f}; ")
+        f.write(f"{min_val_s:.4f}; ")
+        potential_solid = model.gfw(p[0])
+        potential_liquid = model.gfw(p[3])
+        f.write(f"{potential_liquid:.4f}; ")
+        f.write(f"{potential_solid:.4f}; ")
+        f.write(f"{ngs.Integrate(model.get_energy(), mesh):.4f}; ")
+        f.write(f"\n")
 
 timestep = 0
 def callback():
@@ -189,6 +225,7 @@ def callback():
     if timestep % 10 == 1:
         plot_function_over_directions(model.get_concentrations()[fosterite], "fosterite", fosterite_plots)
     plot_energy_over_directions(model.Vm * model.get_chemical_energy(), model.get_concentrations()[fosterite])
+    write_to_file()
 
     model.set_Temperature(cooling(model.time))
     print(f"Time: {model.time}, energy: {ngs.Integrate(model.get_energy(), mesh)}")
