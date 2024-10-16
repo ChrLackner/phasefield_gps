@@ -3,3 +3,4 @@
 src/phasefield_gps/_version.py
 **/.ipynb_checkpoints
 /docs/ltximg/
+examples/one_grain_olivin/plots

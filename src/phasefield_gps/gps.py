@@ -402,12 +402,11 @@ Initial conditions for phase. For components, for each phase an initial conditio
         self.components[1].phase_energies = { phase : energies[1][phase] for phase in self.phases }
         # print("new energies = ", self.components[0].phase_energies)
 
-    def plot_energy_landscape(self):
+    def plot_energy_landscape(self, times=1):
         assert len(self.components) == 2
         import matplotlib.pyplot as plt
         import numpy as np
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
+        fig, axs = plt.subplots(times, 1, figsize=(6,8))
         c1, c2 = self.components
         assert type(c1) == IdealSolutionComponent and type(c2) == IdealSolutionComponent
         for phase in self.phases:
@@ -415,15 +414,15 @@ Initial conditions for phase. For components, for each phase an initial conditio
             # e_vals = [c * c1.phase_energies[phase] + (1-c) * c2.phase_energies[phase] + phase.site_variable * 8.314 * self.T.Get() * (c*ngs.log(c) + (1-c) * ngs.log(1-c))for c in c_vals]
             e_vals = [phase.get_chemical_energy({ self.components[0] : c, self.components[1]: 1-c }, self.T.Get(), use_ifpos=False) for c in c_vals]
             ind = e_vals.index(min(e_vals))
-            ax.plot(c_vals, e_vals, label=phase.name + " " + str(c_vals[ind]))
+            for ax in axs:
+                ax.plot(c_vals, e_vals, label=phase.name + " " + str(c_vals[ind]))
         # hard coded for now
-        xvals = np.linspace(-0.5e-3, 0.5e-3, 11)
-        pts = self.mesh(xvals, 0.)
-        cvals = self.get_concentrations()[self.components[0]](pts)
-        energies = self.Vm * self.get_chemical_energy()(pts)
-        ax.plot(cvals, energies, "o", label="Concentrations")
-
-        fig.legend()
+        # xvals = np.linspace(-0.5e-3, 0.5e-3, 11)
+        # pts = self.mesh(xvals, 0.)
+        # cvals = self.get_concentrations()[self.components[0]](pts)
+        # energies = self.Vm * self.get_chemical_energy()(pts)
+        # ax.plot(cvals, energies, "o", label="Concentrations")
+        # fig.legend()
         return fig
 
     @ngs.TimeFunction
