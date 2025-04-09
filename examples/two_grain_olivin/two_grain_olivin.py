@@ -8,7 +8,7 @@ import numpy as np
 # this selects the seed for the random number generator
 random.seed(1)
 
-initial_temperature = 1700 # K
+initial_temperature = 1300 # K
 end_temperature = 1373.15 # K
 cooling_rate = 0.1/3600 # K/s
 
@@ -28,7 +28,7 @@ r1 = random.random() * 2 * ngs.pi
 # this fixes angle to 0:
 # r1 = 0
 mat = np.array([[np.cos(r1), -np.sin(r1)], [np.sin(r1), np.cos(r1)]])
-factor = 1e4
+factor = 1e3
 v1s = []
 v2s = []
 
@@ -152,6 +152,11 @@ for comp, conc in model.get_concentrations().items():
 ngs.Draw(model.get_phase(solid), mesh, "solid")
 ngs.Draw(model.get_phase(solid2), mesh, "solid2")
 ngs.Draw(model.get_phase(liquid), mesh, "liquid")
+l = model.get_phase(liquid)
+s1 = model.get_phase(solid)
+s2 = model.get_phase(solid2)
+phases = ngs.IfPos(s1 - 0.5, 1, ngs.IfPos(s2 - 0.5, 2, 0))
+ngs.Draw(phases, mesh, "phases")
 
 timestep = 0
 def callback():
@@ -170,6 +175,6 @@ with ngs.TaskManager():
     model.do_timestep()
     callback()
     model.set_timestep(0.1)
-    model.solve(500, callback=callback)
+    model.solve(5000, callback=callback)
 
 print("finish")

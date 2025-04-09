@@ -11,15 +11,13 @@ todo: Anisotropy
 
 * Grand Potential
 
-Most of this is taken from [cite:@PhysRevE.98.023309].
+In [cite:@PhysRevE.98.023309] Aagsen et al. introduced a phase-field model for multicomponent alloys. The model is based on the grand potential formalism with the advantage of decoupling the interface thickness from the energy formulations.  This property is crucial for modeling the evolution of interfaces at the nanometer scale within a mesoscale framework.
 
-This phase-field model describes $N$ possible phases and $K$ chemical species.
-The individual phases are represented y a set of nonconserved order parameters
+This phase-field model describes $N$ phases and $K$ chemical species.
+The phases are represented by a set of order parameters
 $\eta_{i}$, $i=1,\ldots,N$.
 
-We track the number density $\rho$ of each solute species at each position.
-Assuming each chemical species has the same atomic volume $V_a$, $K-1$ variables are required and the $K$ species is considered the solvent.
-The number density of species $k$ is related to its local molar fraction $c_k$ by
+To represent the system's composition, the number density $\rho$ of each solute species is tracked at each position. Assuming each chemical species has the same atomic volume $V_a$, $K-1$ variables are required and the $K$-th species is considered the solvent. The number density of species $k$ is related to its local molar fraction $c_k$ by
 
 $$
 \rho_k = \frac{c_k}{V_m}
@@ -27,14 +25,14 @@ $$
 
 with $V_m$ the molar volume.
 
-The total grand potential $\Omega$ of the system is defined as
+The total grand potential $\Omega$ of the system consists of three contributions: the multiwell potential $\omega_{mw}$, the gradient contribution $\omega_{grad}$, and the chemical contribution $\omega_{chem}$:
+
 
 $$
 \Omega = \int_V (\omega_{mw} + \omega_{grad} + \omega_{chem}) \, dx
 $$
 
 ** Multiwell potential
-
 
 [cite:@PhysRevB.78.024113] proposed a homogeneous free energy $\omega_{mw}$ of the form 
 
@@ -48,11 +46,17 @@ $$
 (\eta_1, \ldots, \eta_N) = ( \pm 1, 0, \ldots, 0 ), ( 0, \pm 1, \ldots, 0), \ldots, ( 0, \ldots, 0, \pm 1)
 $$
 
+#+CAPTION: Energy landscape in $[-1,1]^2$ for $\gamma = 1.5, m = 1$
+#+ATTR_ORG: :width 400px
+#+ATTR_LATEX: :width 14cm :placement
+[[./org_images/landscapeUmy1y8.png]]
+
+
 Interfacial anisotropy can be included by making $\gamma_{ij}$ dependent on the interface orientation.
 
 ** The gradient contribution
 
-The gradient contribution $\omega_{grad}$ is defined as
+The gradient contribution is responsible to penalize interface states. It is defined as $\omega_{grad}$:
 
 $$
 \omega_{grad} = \frac{\kappa}{2} \sum_{i=1}^N \left| \nabla \eta_i \right|^2
@@ -68,7 +72,7 @@ $$
 
 with $h_i$ an interpolation function for phase $i$ and $\omega_i$ the grand potential density of phase $i$.
 
-The interpolation function $h_i$ is defined as [cite:@moelansQuantitativeThermodynamicallyConsistent2011]
+As the interpolation function $h_i$ we use the definition from [cite:@moelansQuantitativeThermodynamicallyConsistent2011]
 
 $$
 h_i = \frac{\eta_i^2}{\sum_{j=1}^N \eta_j^2}
@@ -86,9 +90,7 @@ where $f_i$ is the Helmholtz free energy density of phase $i$ and $\mu_k$ is the
 
 *** Ideal solution model
 
-\todo{Binary for now, generalize later. -> only one species with concentration $c$ and solvent $1-c$.}
-
-In an ideal solution model, the free energy is a weighted average of the pure substance free energies of A and B plus an entropy of mixing term [cite:@PhysRevE.84.031601]:
+In this paper we use two component model with an ideal solution model. The free energy is a weighted average of the pure substance free energies of A and B plus an entropy of mixing term [cite:@PhysRevE.84.031601]:
 
 $$
 f_i(T,c) = (1-c) f_i^A(T) + c f_i^B(T) + s_i RT \left[ c \ln c + (1-c) \ln (1-c) \right]

@@ -1,4 +1,4 @@
-% Created 2024-08-19 Mon 09:25
+% Created 2024-11-27 Wed 15:04
 % Intended LaTeX compiler: pdflatex
 \documentclass[11pt]{article}
 \usepackage[utf8]{inputenc}
@@ -37,17 +37,15 @@ todo: Document strict mass conservation
 todo: Anisotropy
 
 \section{Grand Potential}
-\label{sec:org9b950ef}
+\label{sec:orgc2847ae}
 
-Most of this is taken from (\citeprocitem{1}{Aagesen et al. 2018}).
+In (\citeprocitem{1}{Aagesen et al. 2018}) Aagsen et al. introduced a phase-field model for multicomponent alloys. The model is based on the grand potential formalism with the advantage of decoupling the interface thickness from the energy formulations.  This property is crucial for modeling the evolution of interfaces at the nanometer scale within a mesoscale framework.
 
-This phase-field model describes \(N\) possible phases and \(K\) chemical species.
-The individual phases are represented y a set of nonconserved order parameters
+This phase-field model describes \(N\) phases and \(K\) chemical species.
+The phases are represented by a set of order parameters
 \(\eta_{i}\), \(i=1,\ldots,N\).
 
-We track the number density \(\rho\) of each solute species at each position.
-Assuming each chemical species has the same atomic volume \(V_a\), \(K-1\) variables are required and the \(K\) species is considered the solvent.
-The number density of species \(k\) is related to its local molar fraction \(c_k\) by
+To represent the system's composition, the number density \(\rho\) of each solute species is tracked at each position. Assuming each chemical species has the same atomic volume \(V_a\), \(K-1\) variables are required and the \$K\$-th species is considered the solvent. The number density of species \(k\) is related to its local molar fraction \(c_k\) by
 
 $$
 \rho_k = \frac{c_k}{V_m}
@@ -55,15 +53,15 @@ $$
 
 with \(V_m\) the molar volume.
 
-The total grand potential \(\Omega\) of the system is defined as
+The total grand potential \(\Omega\) of the system consists of three contributions: the multiwell potential \(\omega_{mw}\), the gradient contribution \(\omega_{grad}\), and the chemical contribution \(\omega_{chem}\):
+
 
 $$
 \Omega = \int_V (\omega_{mw} + \omega_{grad} + \omega_{chem}) \, dx
 $$
 
 \subsection{Multiwell potential}
-\label{sec:orgf73f7a9}
-
+\label{sec:org1b546ea}
 
 (\citeprocitem{3}{Moelans, Blanpain, and Wollants 2008}) proposed a homogeneous free energy \(\omega_{mw}\) of the form 
 
@@ -77,19 +75,26 @@ $$
 (\eta_1, \ldots, \eta_N) = ( \pm 1, 0, \ldots, 0 ), ( 0, \pm 1, \ldots, 0), \ldots, ( 0, \ldots, 0, \pm 1)
 $$
 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=14cm]{./org_images/landscapeUmy1y8.png}
+\caption{Energy landscape in \([-1,1]^2\) for \(\gamma = 1.5, m = 1\)}
+\end{figure}
+
+
 Interfacial anisotropy can be included by making \(\gamma_{ij}\) dependent on the interface orientation.
 
 \subsection{The gradient contribution}
-\label{sec:orgfe87ecd}
+\label{sec:orgc735cf5}
 
-The gradient contribution \(\omega_{grad}\) is defined as
+The gradient contribution is responsible to penalize interface states. It is defined as \(\omega_{grad}\):
 
 $$
 \omega_{grad} = \frac{\kappa}{2} \sum_{i=1}^N \left| \nabla \eta_i \right|^2
 $$
 
 \subsection{The chemical contribution}
-\label{sec:orgf6f89d5}
+\label{sec:org649f456}
 
 The chemical contribution \(\omega_{chem}\) is defined as
 
@@ -99,7 +104,7 @@ $$
 
 with \(h_i\) an interpolation function for phase \(i\) and \(\omega_i\) the grand potential density of phase \(i\).
 
-The interpolation function \(h_i\) is defined as (\citeprocitem{4}{Moelans 2011})
+As the interpolation function \(h_i\) we use the definition from (\citeprocitem{4}{Moelans 2011})
 
 $$
 h_i = \frac{\eta_i^2}{\sum_{j=1}^N \eta_j^2}
@@ -114,14 +119,12 @@ $$
 where \(f_i\) is the Helmholtz free energy density of phase \(i\) and \(\mu_k\) is the chemical potential difference between species \(k\) and the solvent.
 
 \subsection{Free energy functions}
-\label{sec:orgc61a2eb}
+\label{sec:orgba627a8}
 
 \subsubsection{Ideal solution model}
-\label{sec:org64a5d99}
+\label{sec:org41f6411}
 
-\todo{Binary for now, generalize later. -> only one species with concentration $c$ and solvent $1-c$.}
-
-In an ideal solution model, the free energy is a weighted average of the pure substance free energies of A and B plus an entropy of mixing term (\citeprocitem{5}{Plapp 2011}):
+In this paper we use two component model with an ideal solution model. The free energy is a weighted average of the pure substance free energies of A and B plus an entropy of mixing term (\citeprocitem{5}{Plapp 2011}):
 
 $$
 f_i(T,c) = (1-c) f_i^A(T) + c f_i^B(T) + s_i RT \left[ c \ln c + (1-c) \ln (1-c) \right]
@@ -167,13 +170,13 @@ $$
 \chi_{kl}(\eta, \mu) = \frac{\partial \rho_k}{\partial \mu_l} = \frac{1}{V_m R T} \sum_{i=1}^N h_i(\eta) c_i(\mu) (1-c_i(\mu))
 $$
 
-for details see \hyperref[sec:orga844052]{Derivation of susceptibility}.
+for details see \hyperref[sec:orgc44efe4]{Derivation of susceptibility}.
 
 \section{Evolution Equations}
-\label{sec:org4961ef6}
+\label{sec:org43d98ea}
 
 \subsection{Phase order parameters}
-\label{sec:org246fdcc}
+\label{sec:orgc4e45d8}
 
 Each order parameter \(\eta_i\) evolves by an Allen-Cahn equation
 
@@ -207,7 +210,7 @@ So this gives in total:
 \end{align*}
 
 \subsection{Chemical potentials}
-\label{sec:org3bc8283}
+\label{sec:orga068fbd}
 
 In the case when all interdiffusivities are zero we get
 
@@ -220,10 +223,10 @@ $$
 \chi_{kl} = \frac{\partial \rho_k}{\partial \mu_l}
 $$
 
-for details see \hyperref[sec:orgb8d1e50]{Derivation of evolution equation for chemical potential}.
+for details see \hyperref[sec:org7570298]{Derivation of evolution equation for chemical potential}.
 
 \section{Calculation of Model Parameters}
-\label{sec:orgbd4346e}
+\label{sec:orge0b1bfa}
 
 from (\citeprocitem{3}{Moelans, Blanpain, and Wollants 2008}):
 
@@ -242,7 +245,7 @@ m = \frac{\sigma_{gb}}{l_{gb}} \frac{1}{\sqrt{f_{0,\text{interf}}(\gamma)}} \app
 $$
 
 \section{Anisotropy}
-\label{sec:org3e3dd88}
+\label{sec:org5c473a0}
 
 From (\citeprocitem{2}{McFadden et al. 1993}):
 
@@ -253,10 +256,10 @@ $$
 $$
 
 \section{Appendix}
-\label{sec:org9afb58f}
+\label{sec:org65ebbad}
 
 \subsection{Table of Units}
-\label{sec:org242c115}
+\label{sec:orga07b29b}
 
 \begin{center}
 \begin{tabular}{lll}
@@ -280,7 +283,7 @@ Quantity & Unit & SI\\[0pt]
 
 
 \subsection{Inversion of chemical potential}
-\label{sec:orgc74b4cc}
+\label{sec:orgb736cca}
 
 \begin{align*}
 \mu_k = \epsilon_i^k + s_i R T \ln{\left(\frac{c_k}{1-\sum_{l=1}^{K-1} c_l}\right)} = \epsilon_i^k + s_i R T \ln{\left(\frac{c_k}{c_K}\right)} \\
@@ -302,7 +305,7 @@ and defining \(\alpha_i^k := e^{\frac{\mu_k - \epsilon_i^k}{s_i R T}}\) we get
 
 
 \subsection{Derivation of susceptibility}
-\label{sec:orga844052}
+\label{sec:orgc44efe4}
 
 \begin{align*}
 \chi_{k,l}(\eta, \mu) = \frac{\partial \rho_k}{\partial \mu_l} = \frac{1}{V_m} \frac{\partial c_k(\eta, \mu)}{\partial \mu_l} = \frac{1}{V_m} \sum_{i=1}^N h_i(\eta) \frac{\partial c_k(\mu)}{\partial \mu_l} = \\
@@ -336,7 +339,7 @@ $$
 
 
 \subsection{Derivation of evolution equation for chemical potential}
-\label{sec:orgb8d1e50}
+\label{sec:org7570298}
 
 From the generalized diffusion equation
 
@@ -380,7 +383,7 @@ $$
 
 
 \section{Bibliography}
-\label{sec:org5518afe}
+\label{sec:org642fa88}
 
 \begin{hangparas}{1.5em}{1}
 \hypertarget{citeproc_bib_item_1}{Aagesen, Larry K., Yipeng Gao, Daniel Schwen, and Karim Ahmed. 2018. “Grand-Potential-Based Phase-Field Model for Multiple Phases, Grains, and Chemical Components.” \textit{Phys. Rev. E} 98 (2): 023309. \url{https://doi.org/10.1103/PhysRevE.98.023309}.}

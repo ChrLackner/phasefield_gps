@@ -60,6 +60,7 @@ l : float
         """
         self.mesh = mesh
         self.components = components
+        self.time_set_callback = None
         self.phases = phases
         self.phase_indices = { phase : i for i, phase in enumerate(self.phases) }
         self.component_indices = { component : i for i, component in enumerate(self.components) }
@@ -86,7 +87,7 @@ l : float
         self.dt.Set(dt)
         self._user_timestep = dt
 
-    def kappa(self, etas=None) -> ngs.CF | float:
+    def kappa(self, etas=None) -> ngs.CoefficientFunction | float:
         for i in range(len(self.phase_indices)):
             for j in range(i+1, len(self.phase_indices)):
                 if self.gamma[i,j] != 1.5:
@@ -125,10 +126,10 @@ l : float
         # ngs.Draw(sigma, self.mesh, "sigma")
         return sigma
 
-    def m(self, etas=None) -> ngs.CF | float:
+    def m(self, etas=None) -> ngs.CoefficientFunction | float:
         return 6 * self.sigma(etas)/self.l
 
-    def set_Temperature(self, T, new_concentrations : None | dict[Phase, ngs.CF]=None):
+    def set_Temperature(self, T, new_concentrations : None | dict[Phase, ngs.CoefficientFunction]=None):
         if hasattr(self, "gfetas"):
             print("Set temperature to", T)
             if new_concentrations is not None:
@@ -276,8 +277,8 @@ l : float
         omega = self.get_energy(etas, w)
 
         self.a = ngs.BilinearForm(self.fes)
-        forms = 1/self.dt * (etas-self.gfetas_old) * detas * ngs.dx
-        forms += (self.L * omega * ngs.dx).Diff(etas, detas)
+        forms = 1/self.dt * (etas-self.gfetas_old) * detas
+        forms += (self.L * omega).Diff(etas, detas)
         if self.mass_conservation:
             assert n_c == 2, "more components still need to be implememented " + str(n_c)
             mui = []
@@ -288,7 +289,7 @@ l : float
                     solvent=self.components[1], T=self.T)[self.components[0]])
             dmudphi = ngs.CF(tuple(mui))
             chi = self.get_chi(etas, w)
-            forms += 8.314 * self.T * self.L * w[0] * chi * dmudphi * detas * ngs.dx
+            forms += 8.314 * self.T * self.L * w[0] * chi * dmudphi * detas
         else:
             raise Exception("Not yet implemented!")
 
@@ -297,25 +298,25 @@ l : float
         concentrations = self._get_concentrations(list_etas, w)
         if self.mass_conservation:
             for ci, dci, gfci_old in zip(c, dc, [self.gfcs_old]):
-                forms += 1/self.dt * (ci-gfci_old) * dci * ngs.dx
+                forms += 1/self.dt * (ci-gfci_old) * dci
             Dchi = self.get_D_times_chi(etas, w)
             for wi, dci in zip(w, dc):
                 # forms += self.Vm * Dchi * ngs.InnerProduct(ngs.grad(wi),ngs.grad(dci)) * ngs.dx
-                forms += ngs.InnerProduct(ngs.grad(wi),Dchi * ngs.grad(dci)) * ngs.dx
+                forms += ngs.InnerProduct(ngs.grad(wi),Dchi * ngs.grad(dci))
             for ci, dwi in zip(c, dw):
-                forms += (concentrations[self.components[0]] - ci) * dwi * ngs.dx
+                forms += (concentrations[self.components[0]] - ci) * dwi
         else:
             chi = self.get_chi(etas, w)
             Dchi = self.get_D_times_chi(etas, w)
             # forms += self.Vm * chi * 1/self.dt * (w[0]-self.gfw_old[0]) * dw * ngs.dx
             # forms += self.Vm * Dchi * ngs.InnerProduct(ngs.grad(w[0]),ngs.grad(dw[0])) * ngs.dx
-            forms += chi * 1/self.dt * (w[0]-self.gfw_old[0]) * dw * ngs.dx
-            forms += ngs.InnerProduct(ngs.grad(w[0]),Dchi * ngs.grad(dw[0])) * ngs.dx
+            forms += chi * 1/self.dt * (w[0]-self.gfw_old[0]) * dw
+            forms += ngs.InnerProduct(ngs.grad(w[0]),Dchi * ngs.grad(dw[0]))
             rho = 1/self.Vm * concentrations[self.components[0]]
             for etai in list_etas:
                 etai.MakeVariable()
-            forms += self.Vm * sum(rho.Diff(etai) * 1/self.dt * (etai - etai_old) for etai, etai_old in zip(list_etas, self.gfetas_old.components)) * dw * ngs.dx
-        self.a += forms.Compile()
+            forms += self.Vm * sum(rho.Diff(etai) * 1/self.dt * (etai - etai_old) for etai, etai_old in zip(list_etas, self.gfetas_old.components)) * dw
+        self.a += (forms.Compile() * ngs.dx)
         # self.c = ngs.Preconditioner(self.a, "bddc")
 
     def get_concentrations(self) -> dict[Component,ngs.CoefficientFunction]:
@@ -394,7 +395,12 @@ Initial conditions for phase. For components, for each phase an initial conditio
                 break
             check_in_between += 1
         if check_in_between == len(find): # not found
-            ind1 = np.where(pts < X)[0][-1]
+            #ind1 = np.where(pts < X)[0][-1]
+            ind1_vals = np.where(pts < X)[0]
+            if len(ind1_vals) == 0:
+                ind1 = 0
+            else:
+                ind1 = ind1_vals[-1]
             ind2 = ind1+1
         derivative = ((g[ind2] - g[ind1]) / (pts[ind2] - pts[ind1]))
         # print("derivative = ", derivative)
@@ -406,7 +412,7 @@ Initial conditions for phase. For components, for each phase an initial conditio
         assert len(self.components) == 2
         import matplotlib.pyplot as plt
         import numpy as np
-        fig, axs = plt.subplots(times, 1, figsize=(6,8))
+        fig, axs = plt.subplots(times, 1) #, figsize=(6,8))
         c1, c2 = self.components
         assert type(c1) == IdealSolutionComponent and type(c2) == IdealSolutionComponent
         for phase in self.phases:
@@ -414,15 +420,18 @@ Initial conditions for phase. For components, for each phase an initial conditio
             # e_vals = [c * c1.phase_energies[phase] + (1-c) * c2.phase_energies[phase] + phase.site_variable * 8.314 * self.T.Get() * (c*ngs.log(c) + (1-c) * ngs.log(1-c))for c in c_vals]
             e_vals = [phase.get_chemical_energy({ self.components[0] : c, self.components[1]: 1-c }, self.T.Get(), use_ifpos=False) for c in c_vals]
             ind = e_vals.index(min(e_vals))
-            for ax in axs:
-                ax.plot(c_vals, e_vals, label=phase.name + " " + str(c_vals[ind]))
+            if times == 1:
+                axs.plot(c_vals, e_vals, label=phase.name + " " + str(c_vals[ind]))
+            else:
+                for ax in axs:
+                    ax.plot(c_vals, e_vals, label=phase.name + " " + str(c_vals[ind]))
         # hard coded for now
-        # xvals = np.linspace(-0.5e-3, 0.5e-3, 11)
-        # pts = self.mesh(xvals, 0.)
-        # cvals = self.get_concentrations()[self.components[0]](pts)
-        # energies = self.Vm * self.get_chemical_energy()(pts)
-        # ax.plot(cvals, energies, "o", label="Concentrations")
-        # fig.legend()
+        xvals = np.linspace(-0.5e-3, 0.5e-3, 11)
+        pts = self.mesh(xvals, 0.)
+        cvals = self.get_concentrations()[self.components[0]](pts)
+        energies = self.Vm * self.get_chemical_energy()(pts)
+        axs.plot(cvals, energies, "o", label="Concentrations")
+        fig.legend()
         return fig
 
     @ngs.TimeFunction
@@ -439,8 +448,12 @@ Initial conditions for phase. For components, for each phase an initial conditio
                                                    # solver=lin_solver)
                                                    inverse="pardiso")
         try:
+            self.set_time(self.time + self.dt.Get())
             store_gf_old = self.gf_old.vec.Copy()
-            solver.Solve(maxerr=1e-9, printing=self.print_newton, callback=callback)
+            import time
+            start = time.time()
+            (erm, its) = solver.Solve(maxerr=1e-6, printing=self.print_newton, callback=callback, dampfactor=0.2)
+            print("solve needed", time.time()-start, "for", its, "iterations")
             if self.timestepping_tolerance is not None:
                 self._gf_coarse.vec.data = self.gf.vec
                 energy_coarse = self.get_energy(self._gfetas_coarse, self._gfw_coarse)
@@ -466,9 +479,10 @@ Initial conditions for phase. For components, for each phase an initial conditio
             #     print("Increase timestep to:", self.dt.Get())
         except NonlinearException as e:
             if self.dt.Get() > self.min_timestep:
+                self.time -= self.dt.Get()
                 self.dt.Set(self.dt.Get()/2)
                 self.gf.vec.data = self.gf_old.vec
-                print(str(e) + ", try smaller timestep:", self.dt.Get())
+                print(str(e) + ", try smaller timestep:", self.dt.Get(), "!!!!!!!!!!!!!!!!!!")
                 self.do_timestep()
             else:
                 raise e
@@ -479,3 +493,8 @@ Initial conditions for phase. For components, for each phase an initial conditio
             self.do_timestep()
             if callback is not None:
                 callback()
+
+    def set_time(self, time):
+        self.time = time
+        if self.time_set_callback is not None:
+            self.time_set_callback()

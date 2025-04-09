@@ -6,11 +6,11 @@ import matplotlib.pyplot as plt
 import random
 import numpy as np
 
-initial_temperature = 1700 # K
+initial_temperature = 1700.15 # K
 end_temperature = 1373.15 # K
-cooling_rate = 0.1/3600 # K/s
+cooling_rate = 1/3600 # K/s
 
-conc_liquid = 0.5
+conc_liquid = 0.18
 
 # mesh
 nel = 50
@@ -24,7 +24,7 @@ mesh = ngmeshes.MakeStructured2DMesh(
 # this fixes angle to 0:
 r1 = 0
 mat = np.array([[np.cos(r1), -np.sin(r1)], [np.sin(r1), np.cos(r1)]])
-factor = 1e4
+factor = 6 # 1e4
 v1s = []
 v2s = []
 
@@ -35,25 +35,29 @@ v4 = np.array([-1, 1])
 v1s.append(ngs.CF(tuple(np.dot(mat, v1))))
 v2s.append(ngs.CF(tuple(np.dot(mat, v2))))
 
-directional_surface_energies = { tuple(np.dot(mat, v1)) : 2.45 * factor,
-                                 tuple(np.dot(mat, v2)) : 0.5 * 2.45 * factor,
+directional_surface_energies = { tuple(np.dot(mat, v1)) : 1.00 * 2.45 * factor,
+                                 tuple(np.dot(mat, v2)) : 0.50 * 2.45 * factor,
                                  tuple(np.dot(mat, v3)) : 0.83 * 2.45 * factor,
                                  tuple(np.dot(mat, v4)) : 0.83 * 2.45 * factor }
-
+                                 
 D0_sol = 10**(-8.27)
 Ea = 226000
 P = 1e5
 V = 7e-6
+R = 8.31446261815324 # J K^-1 mol^-1
 Feterm = lambda concentration: 3*((1-concentration) - 0.14)
 
+
 temp = ngs.Parameter(initial_temperature)
-R = 8.31446261815324 # J K^-1 mol^-1
-diff_coef_solid1 = lambda concentration: D0_sol * ngs.exp(-(Ea+(P-1e5)*V)/(R*temp)) *10**Feterm(concentration) * (ngs.OuterProduct(v1s[0], v1s[0]) + 6 * 3e-12 * ngs.OuterProduct(v2s[0], v2s[0]))
-if_mobility = 1e-13 * ngs.exp(0 * temp)
+
+diff_coef_solid1 = lambda concentration: D0_sol * ngs.exp(-(Ea+(P-1e5)*V)/(R*temp)) *10**Feterm(concentration) * (ngs.OuterProduct(v1s[0], v1s[0]) + 6 * ngs.OuterProduct(v2s[0], v2s[0]))
+#diff_coef_solid1 = lambda concentration: D0_sol * ngs.exp(-(Ea+(P-1e5)*V)/(R*temp)) *10**Feterm(concentration) * (ngs.OuterProduct(v1s[0], v1s[0]) + 6 * 3e-12 * ngs.OuterProduct(v2s[0], v2s[0]))
+if_mobility = 1e-12 * ngs.exp(0 * temp)
 
 liquid = Phase("liquid", diffusion_coefficient=3e-7)
 solid = Phase("solid", diffusion_coefficient=diff_coef_solid1,
-              surface_energies= { liquid: directional_surface_energies,
+              surface_energies= { liquid: 2.45*
+              factor, #directional_surface_energies,
                                   "kappa": 0.2 })
 
 fosterite_liquid = "foL_1373-2273-10.tab"
@@ -72,12 +76,12 @@ model = GrandPotentialSolver(mesh=mesh,
                              components=[fosterite, fayalite],
                              phases=[liquid, solid],
                              molar_volume=4.3e-5, # m**3/mol
-                             interface_mobility=1e-13, # m**4/J/s
+                             interface_mobility=if_mobility, # 1e-12, # m**4/J/s
                              temperature=temp, # K
                              interface_width=5e-5) # m
-model.order = 3
+model.order = 2
 
-r = 5 * 1e-5
+r = 10 * 1e-5
 rx = ngs.sqrt(ngs.x**2 + ngs.y**2) - r
 
 # compute energy diagrams for full liquid concentation
@@ -113,7 +117,6 @@ def cooling(time):
     temp = initial_temperature - (cooling_rate * time)
     if temp < end_temperature:
         temp = end_temperature
-    print("Change temperature to:", temp)
     return temp
 
 for comp, conc in model.get_concentrations().items():
@@ -160,6 +163,7 @@ def plot_function_over_directions(func, name, value_dict):
         ax[i].set_title(f"{name} over {key}")
     plt.tight_layout()
     fig.savefig(os.path.join("results", f"{name}.png"))
+    plt.close('all')
 
 if os.path.exists(os.path.join("results", "energy")):
     for f in os.listdir(os.path.join("results", "energy")):
@@ -178,18 +182,25 @@ def plot_energy_over_directions(energy, concentration):
         ax[i].set_title(f"{key}")
     plt.tight_layout()
     fig.savefig(os.path.join("results", "energy", f"time_{model.time:.2f}.png"))
+    plt.close('all')
 
 output_file = os.path.join("results", "output.csv")
 with open(output_file, "w") as f:
-    f.write("time; Temp; XMg1_x; XMg2_x; XMg3_x; XMg4_x; XMg1_y; XMg2_y; XMg3_y; XMg4_y; XMg1_xy; XMg2_xy; XMg3_xy; XMg4_xy; IF Pos x; IF Pos y; IF Pos xy; GGW Liq; GGW Sol; Pot Liq; Pot Sol; Energy\n")
+    f.write("time; Temp; XMg1_x; XMg2_x; XMg3_x; XMg4_x; XMg1_y; XMg2_y; XMg3_y; XMg4_y; XMg1_xy; XMg2_xy; XMg3_xy; XMg4_xy; IF_Pos_x; IF_Pos_y; IF_Pos_xy; GGW_Liq; GGW_Sol; Pot_Liq; Pot_Sol; Energy\n")
 def write_to_file():
     pvals = { }
     xmg = model.get_concentrations()[fosterite]
     if_pos = {}
     for key, d in dirs.items():
         solid_vals = model.get_phase(solid)(d).flatten()
-        i1 = np.where(solid_vals > 0.9)[0][-1]
-        i2 = np.where(solid_vals < 0.1)[0][0]
+        #i1 = np.where(solid_vals > 0.9)[0][-1]
+        #i2 = np.where(solid_vals < 0.1)[0][0]
+        i1 = np.where(solid_vals > 0.8)[0][-1]
+        l_vals = np.where(solid_vals < 0.2)[0]
+        if len(l_vals) == 0:
+            i2 = -1
+        else:
+            i2 = l_vals[0]
         p = [d[0], d[i1], d[i2], d[-1]]
         pvals[key] = [xmg(p[i]) for i in range(4)]
         if_pos[key] = 0.5 * (i1 + i2)/len(d)
@@ -214,11 +225,18 @@ def write_to_file():
         f.write(f"{ngs.Integrate(model.get_energy(), mesh):.4f}; ")
         f.write(f"\n")
 
+vol = ngs.Integrate(1, mesh)
+
+def set_time():
+    model.set_Temperature(cooling(model.time))
+
+model.time_set_callback = set_time
 timestep = 0
+import time
 def callback():
     global timestep
     timestep += 1
-    if timestep % 10 == 0:
+    if timestep % 3 == 0 and model.dt.Get() < 10000:
         model.set_timestep(model.dt.Get()*2)
         print("increase timestep to", model.dt.Get())
 
@@ -227,10 +245,9 @@ def callback():
     plot_energy_over_directions(model.Vm * model.get_chemical_energy(), model.get_concentrations()[fosterite])
     write_to_file()
 
-    model.set_Temperature(cooling(model.time))
+    print(f"liquid/solid = {ngs.Integrate(model.get_phase(liquid), mesh)/vol} / {ngs.Integrate(model.get_phase(solid), mesh)/vol}")
     print(f"Time: {model.time}, energy: {ngs.Integrate(model.get_energy(), mesh)}")
     ngs.Redraw()
-
 
 with ngs.TaskManager():
     plot_energy_over_directions(model.Vm * model.get_chemical_energy(), model.get_concentrations()[fosterite])
@@ -238,6 +255,6 @@ with ngs.TaskManager():
     model.do_timestep()
     callback()
     model.set_timestep(0.1)
-    model.solve(500, callback=callback)
+    model.solve(1e6, callback=callback)
 
 print("finish")
